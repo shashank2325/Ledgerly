@@ -101,14 +101,14 @@ TBLPROPERTIES (
     -- 32 MB target. Our files will be far smaller than this at personal scale;
     -- the value matters once compaction runs (T2).
     'write_target_data_file_size_bytes' = '33554432',
-    'format-version'                 = '2',
     -- Keep 90 days of snapshots: enough for time travel and rollback, bounded
     -- enough that metadata does not grow without limit.
     'vacuum_max_snapshot_age_seconds' = '7776000'
 );
 
--- Sort order. Iceberg records per-file min/max for sorted columns, so ordering
--- by transaction_date makes date-range predicates prune files inside a
--- partition as well as across partitions.
-ALTER TABLE finance.transactions
-    WRITE ORDERED BY transaction_date ASC, account_id ASC;
+-- NOTE: `ALTER TABLE ... WRITE ORDERED BY` is Spark/Trino syntax that Athena
+-- rejects — Athena cannot set an Iceberg sort order through DDL. Partition
+-- pruning on month(transaction_date) still applies, and at personal scale each
+-- monthly partition is a single small file, so within-partition ordering buys
+-- nothing today. Revisit if a compaction job is added (DESIGN.md T2), which can
+-- write sorted files directly.

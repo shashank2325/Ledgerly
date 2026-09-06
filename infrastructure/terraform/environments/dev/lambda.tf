@@ -8,11 +8,46 @@
 # Phase 2 packages only first-party code — boto3 ships in the Lambda runtime, so
 # there are no third-party dependencies to vendor yet. The Plaid SDK arrives in
 # Phase 3 and will need a build step or a layer.
+# No third-party dependencies to vendor: boto3 ships in the Lambda runtime and
+# the Plaid client is stdlib-only (ADR 0006). So the package is first-party code
+# plus the Iceberg DDL.
+#
+# The .sql files are staged into the build because data/schemas/ is their single
+# source of truth (SPEC §47.29) and duplicating them into the Python package
+# would let the two copies drift.
+resource "null_resource" "stage_lambda_source" {
+  triggers = {
+    # Rebuild when any source or schema file changes.
+    src_hash = sha1(join("", [
+      for f in fileset("${path.module}/../../../../backend/src", "**/*.py") :
+      filesha1("${path.module}/../../../../backend/src/${f}")
+    ]))
+    schema_hash = sha1(join("", [
+      for f in fileset("${path.module}/../../../../data/schemas", "*.sql") :
+      filesha1("${path.module}/../../../../data/schemas/${f}")
+    ]))
+  }
+
+  provisioner "local-exec" {
+    command = <<-CMD
+      set -e
+      BUILD="${path.module}/.build/pkg"
+      rm -rf "$BUILD" && mkdir -p "$BUILD"
+      cp -R "${path.module}/../../../../backend/src/." "$BUILD/"
+      mkdir -p "$BUILD/ledgerly/schemas"
+      cp "${path.module}/../../../../data/schemas/"*.sql "$BUILD/ledgerly/schemas/"
+      find "$BUILD" -name __pycache__ -type d -exec rm -rf {} + 2>/dev/null || true
+    CMD
+  }
+}
+
 data "archive_file" "api" {
   type        = "zip"
-  source_dir  = "${path.module}/../../../../backend/src"
+  source_dir  = "${path.module}/.build/pkg"
   output_path = "${path.module}/.build/api.zip"
   excludes    = ["**/__pycache__", "**/*.pyc"]
+
+  depends_on = [null_resource.stage_lambda_source]
 }
 
 resource "aws_lambda_function" "api" {

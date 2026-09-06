@@ -23,6 +23,8 @@ class Config:
     sync_runs_table: str
     data_bucket: str
     athena_results_bucket: str
+    athena_workgroup: str
+    glue_database: str
     plaid_secret_arn: str
 
     @property
@@ -45,5 +47,7 @@ def get_config() -> Config:
         sync_runs_table=_env("SYNC_RUNS_TABLE"),
         data_bucket=_env("DATA_BUCKET"),
         athena_results_bucket=_env("ATHENA_RESULTS_BUCKET"),
+        athena_workgroup=_env("ATHENA_WORKGROUP"),
+        glue_database=_env("GLUE_DATABASE"),
         plaid_secret_arn=_env("PLAID_SECRET_ARN"),
     )

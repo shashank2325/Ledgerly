@@ -49,6 +49,5 @@ LOCATION 's3://REPLACE_ME_DATA_BUCKET/curated/accounts_snapshot/'
 TBLPROPERTIES (
     'table_type'        = 'ICEBERG',
     'format'            = 'parquet',
-    'write_compression' = 'zstd',
-    'format-version'    = '2'
+    'write_compression' = 'zstd'
 );

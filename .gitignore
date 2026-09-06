@@ -60,3 +60,4 @@ data/samples/real/
 .idea/
 .vscode/
 *.swp
+.build/
