@@ -147,8 +147,12 @@ export interface CashFlowReport {
   total_income: string;
   total_expenses: string;
   net_income: string;
-  /** Percentage, already ×100 by the backend. Not money — no currency symbol. */
-  savings_rate: string;
+  /** Percentage, already ×100 by the backend. Not money — no currency symbol.
+   *  NULL when the ratio is not meaningful — no income to divide by, or
+   *  spending so far past income that the percentage is noise rather than a
+   *  figure. Render an em dash, never a zero: 0% means "kept nothing", which
+   *  is a different claim from "there is no rate to state". */
+  savings_rate: string | null;
   sankey: SankeyData;
 }
 

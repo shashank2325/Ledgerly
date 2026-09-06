@@ -61,8 +61,15 @@ def _require_session(event: dict[str, Any]) -> dict[str, Any] | None:
     if not token:
         return {"statusCode": 401, "headers": JSON_HEADERS,
                 "body": json.dumps({"error": "authentication_required"})}
+    secret_arn = get_config().auth_secret_arn
+    if not secret_arn:
+        # Deployment problem, not a caller problem. Say so plainly rather than
+        # letting boto3 raise an unhandled ParamValidationError as a 500.
+        logger.error("auth_secret_arn_not_configured")
+        return {"statusCode": 503, "headers": JSON_HEADERS,
+                "body": json.dumps({"error": "auth_not_configured"})}
     try:
-        verify_token(token, secret_arn=get_config().auth_secret_arn)
+        verify_token(token, secret_arn=secret_arn)
     except AuthError:
         return {"statusCode": 401, "headers": JSON_HEADERS,
                 "body": json.dumps({"error": "invalid_or_expired_token"})}
@@ -126,6 +133,21 @@ def detect_transfers() -> dict[str, Any]:
     return detect_and_persist(_athena(), cfg.glue_database, accounts)
 
 
+def reprocess() -> dict[str, Any]:
+    """Rebuild the curated layer from raw S3, then re-run transfer detection.
+
+    Detection must follow, because reclassification can change which
+    transactions are eligible to pair.
+    """
+    from ledgerly.pipeline.reprocess import reprocess_transactions
+
+    cfg = get_config()
+    rebuilt = reprocess_transactions(
+        bucket=cfg.data_bucket, client=_athena(), database=cfg.glue_database
+    )
+    return {"reprocess": rebuilt, "transfer_detection": detect_transfers()}
+
+
 def bootstrap_schemas() -> dict[str, Any]:
     """Create the Iceberg tables. Idempotent — safe to call repeatedly."""
     cfg = get_config()
@@ -159,6 +181,8 @@ def handler(event: dict[str, Any], context: Any = None) -> dict[str, Any]:
             body = bootstrap_schemas()
         elif method == "POST" and path == "/sync/detect-transfers":
             body = detect_transfers()
+        elif method == "POST" and path == "/sync/reprocess":
+            body = reprocess()
         else:
             return _response(404, {"error": "not_found", "path": path})
 

@@ -34,6 +34,26 @@ def _money(value: Any) -> Decimal:
     return Decimal(str(value))
 
 
+# Plaid Personal Finance Category primaries that represent SPENDING. Money
+# arriving in one of these is a refund of a purchase, not income — an airline
+# credit is not a paycheck. Anything not listed (INCOME*, TRANSFER_IN,
+# BANK_FEES, or a null category) falls through to INCOME, which is the
+# conservative default: it never hides money that arrived.
+SPENDING_PRIMARIES: frozenset[str] = frozenset({
+    "FOOD_AND_DRINK",
+    "GENERAL_MERCHANDISE",
+    "GENERAL_SERVICES",
+    "TRANSPORTATION",
+    "TRAVEL",
+    "RENT_AND_UTILITIES",
+    "ENTERTAINMENT",
+    "PERSONAL_CARE",
+    "MEDICAL",
+    "HOME_IMPROVEMENT",
+    "GOVERNMENT_AND_NON_PROFIT",
+})
+
+
 def classify(amount: Decimal, raw: dict[str, Any]) -> TransactionType:
     """Initial income/expense classification.
 
@@ -47,10 +67,18 @@ def classify(amount: Decimal, raw: dict[str, Any]) -> TransactionType:
     category = (raw.get("personal_finance_category") or {}).get("primary") or ""
 
     if amount > 0:
-        # Money in. A refund is distinguishable from income by category; when
-        # unclear, INCOME is the safer default since it does not inflate
-        # spending.
-        return TransactionType.REFUND if category == "INCOME_REFUND" else TransactionType.INCOME
+        # Money in. Whether it is income or a refund is decided by the category
+        # it arrived under, not by the sign alone.
+        #
+        # This matters: sandbox data contains six $500 "United Airlines"
+        # credits categorised TRAVEL. Treating any inflow as income turned
+        # $3,000 of refunds into $3,000 of salary AND left $3,000 of travel
+        # spending standing, distorting both sides of the report.
+        if category.startswith("INCOME"):
+            return TransactionType.INCOME
+        if category in SPENDING_PRIMARIES:
+            return TransactionType.REFUND
+        return TransactionType.INCOME
     if amount < 0:
         return TransactionType.EXPENSE
     return TransactionType.UNKNOWN

@@ -60,6 +60,9 @@ export function Money({
     signed: type === "INCOME" || type === "REFUND",
     arrow: type === "TRANSFER" && !forceSign,
     forceSign,
+    // Only an EXPENSE row suppresses its minus sign. Any other negative — a
+    // balance, a net figure, an uncategorised amount — shows it.
+    bareNegative: type === "EXPENSE",
   });
 
   return (

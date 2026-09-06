@@ -73,8 +73,15 @@ def _require_session(event: dict[str, Any]) -> dict[str, Any] | None:
     if not token:
         return {"statusCode": 401, "headers": JSON_HEADERS,
                 "body": json.dumps({"error": "authentication_required"})}
+    secret_arn = get_config().auth_secret_arn
+    if not secret_arn:
+        # Deployment problem, not a caller problem. Say so plainly rather than
+        # letting boto3 raise an unhandled ParamValidationError as a 500.
+        logger.error("auth_secret_arn_not_configured")
+        return {"statusCode": 503, "headers": JSON_HEADERS,
+                "body": json.dumps({"error": "auth_not_configured"})}
     try:
-        verify_token(token, secret_arn=get_config().auth_secret_arn)
+        verify_token(token, secret_arn=secret_arn)
     except AuthError:
         return {"statusCode": 401, "headers": JSON_HEADERS,
                 "body": json.dumps({"error": "invalid_or_expired_token"})}
@@ -210,6 +217,28 @@ def exchange_public_token(event: dict[str, Any]) -> tuple[int, dict[str, Any]]:
     }
 
 
+def remove_connection(event: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+    """Disconnect an institution and remove its data everywhere it is queried."""
+    from ledgerly.analytics import AthenaClient
+    from ledgerly.pipeline.removal import remove_item
+
+    body = _parse_body(event)
+    item_id = body.get("item_id") or (event.get("pathParameters") or {}).get("proxy", "")
+    if not item_id:
+        return 400, {"error": "missing_item_id"}
+
+    cfg = get_config()
+    result = remove_item(
+        item_id,
+        plaid=_client(),
+        items_repo=ItemRepository(cfg.items_table),
+        accounts_table=cfg.accounts_table,
+        athena=AthenaClient(workgroup=cfg.athena_workgroup, database=cfg.glue_database),
+        database=cfg.glue_database,
+    )
+    return (404 if result.get("error") == "item_not_found" else 200), result
+
+
 def list_items(_event: dict[str, Any]) -> tuple[int, dict[str, Any]]:
     """Connected institutions. Uses the token-free projection by construction."""
     cfg = get_config()
@@ -221,6 +250,7 @@ ROUTES = {
     ("POST", "/plaid/link-token"): create_link_token,
     ("POST", "/plaid/exchange"): exchange_public_token,
     ("GET", "/plaid/items"): list_items,
+    ("POST", "/plaid/remove"): remove_connection,
 }
 
 

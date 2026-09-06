@@ -38,6 +38,8 @@ data "aws_iam_policy_document" "plaid_lambda" {
   }
 
   # Access tokens live here. Read/write, but scoped to this one table.
+  # DeleteItem is required to disconnect an institution — without it the item
+  # row survives a removal and the connection appears to still exist.
   statement {
     sid    = "ManageItems"
     effect = "Allow"
@@ -45,6 +47,7 @@ data "aws_iam_policy_document" "plaid_lambda" {
       "dynamodb:GetItem",
       "dynamodb:PutItem",
       "dynamodb:UpdateItem",
+      "dynamodb:DeleteItem",
       "dynamodb:Scan",
     ]
     resources = [aws_dynamodb_table.items.arn]
@@ -59,12 +62,56 @@ data "aws_iam_policy_document" "plaid_lambda" {
       "dynamodb:PutItem",
       "dynamodb:UpdateItem",
       "dynamodb:BatchWriteItem",
+      "dynamodb:DeleteItem",
       "dynamodb:Query",
       "dynamodb:Scan",
     ]
     resources = [
       aws_dynamodb_table.accounts.arn,
       "${aws_dynamodb_table.accounts.arn}/index/*",
+    ]
+  }
+
+  # Removing an institution deletes its curated rows, which is Athena DDL/DML
+  # against the Iceberg tables.
+  statement {
+    sid    = "AthenaDelete"
+    effect = "Allow"
+    actions = ["athena:StartQueryExecution", "athena:GetQueryExecution",
+               "athena:GetQueryResults", "athena:StopQueryExecution", "athena:GetWorkGroup"]
+    resources = [aws_athena_workgroup.main.arn]
+  }
+
+  statement {
+    sid       = "AthenaResults"
+    effect    = "Allow"
+    actions   = ["s3:PutObject", "s3:GetObject", "s3:ListBucket", "s3:GetBucketLocation"]
+    resources = [aws_s3_bucket.athena_results.arn, "${aws_s3_bucket.athena_results.arn}/*"]
+  }
+
+  statement {
+    sid       = "CuratedWrite"
+    effect    = "Allow"
+    actions   = ["s3:PutObject", "s3:GetObject", "s3:DeleteObject", "s3:AbortMultipartUpload"]
+    resources = ["${aws_s3_bucket.data.arn}/curated/*"]
+  }
+
+  statement {
+    sid       = "DataLakeList"
+    effect    = "Allow"
+    actions   = ["s3:ListBucket", "s3:GetBucketLocation"]
+    resources = [aws_s3_bucket.data.arn]
+  }
+
+  statement {
+    sid    = "GlueCatalog"
+    effect = "Allow"
+    actions = ["glue:GetDatabase", "glue:GetDatabases", "glue:GetTable", "glue:GetTables",
+               "glue:UpdateTable", "glue:GetPartition", "glue:GetPartitions"]
+    resources = [
+      "arn:aws:glue:${var.aws_region}:${local.account_id}:catalog",
+      aws_glue_catalog_database.finance.arn,
+      "arn:aws:glue:${var.aws_region}:${local.account_id}:table/${aws_glue_catalog_database.finance.name}/*",
     ]
   }
 
@@ -122,6 +169,8 @@ resource "aws_lambda_function" "plaid" {
       SYNC_RUNS_TABLE  = aws_dynamodb_table.sync_runs.name
       DATA_BUCKET      = aws_s3_bucket.data.id
       PLAID_SECRET_ARN = aws_secretsmanager_secret.plaid.arn
+      ATHENA_WORKGROUP = aws_athena_workgroup.main.name
+      GLUE_DATABASE    = aws_glue_catalog_database.finance.name
       AUTH_SECRET_ARN  = aws_secretsmanager_secret.auth.arn
     }
   }

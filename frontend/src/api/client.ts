@@ -6,7 +6,14 @@
  * backend (SPEC §3): the frontend displays results, it does not compute them.
  */
 
-import type { Account, CashFlowReport } from "@/types";
+import type {
+  Account,
+  CashFlowReport,
+  CategorySpend,
+  MonthlyCashFlow,
+  Transaction,
+  TransferGroup,
+} from "@/types";
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? "";
 
@@ -61,6 +68,44 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return body as T;
 }
 
+export interface TransactionFilters {
+  from?: string;
+  to?: string;
+  account?: string;
+  category?: string;
+  type?: string;
+  search?: string;
+  limit?: number;
+}
+
+export interface TransactionsResponse {
+  transactions: Transaction[];
+  transfer_groups: TransferGroup[];
+  count: number;
+}
+
+export interface DashboardResponse {
+  net_worth: string;
+  account_count: number;
+  month: string;
+  month_income: string;
+  month_spending: string;
+  month_net: string;
+  month_transfers: string;
+  cash_flow: MonthlyCashFlow[];
+  spending_by_category: CategorySpend[];
+}
+
+export interface RemoveResult {
+  item_id: string;
+  institution_name: string | null;
+  plaid_disconnected: boolean;
+  accounts_removed: number;
+  transactions_removed: number;
+  transfer_groups_removed: number;
+  raw_retained: boolean;
+}
+
 export interface AccountsResponse {
   accounts: Account[];
   net_worth: string;
@@ -86,6 +131,25 @@ export const api = {
   getSession: () => request<{ username: string; valid: boolean }>("/auth/session"),
 
   getAccounts: () => request<AccountsResponse>("/accounts"),
+
+  getDashboard: () => request<DashboardResponse>("/dashboard"),
+
+  getTransactions: (filters: TransactionFilters = {}) => {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(filters)) {
+      if (value) params.set(key, String(value));
+    }
+    const query = params.toString();
+    return request<TransactionsResponse>(`/transactions${query ? `?${query}` : ""}`);
+  },
+
+  /** Disconnect an institution and delete its data from every store that
+   *  serves it. The raw layer is retained by design — see pipeline/removal.py. */
+  removeConnection: (itemId: string) =>
+    request<RemoveResult>("/plaid/remove", {
+      method: "POST",
+      body: JSON.stringify({ item_id: itemId }),
+    }),
 
   /** Cash-flow report, Sankey-shaped. Aggregation happens in Athena; the
    *  frontend lays the result out and does not recompute any total. */

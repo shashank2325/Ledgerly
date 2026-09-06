@@ -70,6 +70,10 @@ function RangeControl({
               type="date"
               value={range[field]}
               aria-label={field === "from" ? "Start date" : "End date"}
+              /* Each end bounds the other. Without this the picker will happily
+                 hand back a start after the end, and the API is asked for a
+                 range that cannot contain anything. */
+              {...(field === "from" ? { max: range.to } : { min: range.from })}
               onChange={(e) => e.target.value && onChange({ ...range, [field]: e.target.value })}
               /* color-scheme drives the native picker's own chrome; without it
                  the calendar widget stays light-on-light in dark mode. */
@@ -137,7 +141,12 @@ export function Reports() {
   const income = parseAmount(data.total_income);
   const expenses = parseAmount(data.total_expenses);
   const net = parseAmount(data.net_income);
-  const rate = parseAmount(data.savings_rate);
+  // Null is a real answer from the backend, not a missing one: there is no
+  // meaningful rate when nothing came in, or when spending dwarfs income by
+  // enough that the percentage is noise. `parseAmount` would quietly turn it
+  // into 0, which reads as "you kept none of it" — a claim the report is not
+  // making.
+  const rate = data.savings_rate === null ? null : parseAmount(data.savings_rate);
   const nothingToShow = income === 0 && expenses === 0;
 
   // Money moved between the user's own accounts is still being reported as an
@@ -187,16 +196,25 @@ export function Reports() {
           {/* A percentage, not money — so not a <Money>. Still tabular, still
               with the unit receding. Negative renders ink, not red: reserved
               for states that are actually broken (DESIGN.md §3.2). */}
-          <span
-            className={`t-num-lg tabular-nums ${rate > 0 ? "text-income" : "text-ink"}`}
-            aria-label={`${rate.toFixed(1)} percent of income kept`}
-          >
-            <span aria-hidden="true">
-              {rate < 0 ? "−" : rate > 0 ? "+" : ""}
-              {Math.abs(rate).toFixed(1)}
-              <span className="num-unit">%</span>
+          {rate === null ? (
+            <span
+              className="t-num-lg tabular-nums text-ink-faint"
+              aria-label="No meaningful savings rate for this period"
+            >
+              <span aria-hidden="true">—</span>
             </span>
-          </span>
+          ) : (
+            <span
+              className={`t-num-lg tabular-nums ${rate > 0 ? "text-income" : "text-ink"}`}
+              aria-label={`${rate.toFixed(1)} percent of income kept`}
+            >
+              <span aria-hidden="true">
+                {rate < 0 ? "−" : rate > 0 ? "+" : ""}
+                {Math.abs(rate).toFixed(1)}
+                <span className="num-unit">%</span>
+              </span>
+            </span>
+          )}
         </Stat>
       </div>
 
@@ -227,7 +245,11 @@ export function Reports() {
             {net < 0 && (
               <p className="mt-4 t-small text-ink-muted max-w-[68ch]">
                 Outflows exceeded inflows by{" "}
-                <Money amount={data.net_income} exact={false} size="sm" /> in this period. The
+                {/* The sentence already says which way this went, so the amount
+                    is a magnitude: "exceeded by −$63,863" is a double negative.
+                    EXPENSE is the type that renders an outflow bare. */}
+                <Money amount={data.net_income} type="EXPENSE" exact={false} size="sm" /> in this
+                period. The
                 faded lower part of the Income column is that difference — spending this report
                 has no matching income for.
               </p>

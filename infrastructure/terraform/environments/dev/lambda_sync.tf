@@ -23,6 +23,14 @@ data "aws_iam_policy_document" "sync_lambda" {
     resources = ["${aws_cloudwatch_log_group.sync_lambda.arn}:*"]
   }
 
+  # Verifying the caller's session token.
+  statement {
+    sid       = "ReadAuthSecret"
+    effect    = "Allow"
+    actions   = ["secretsmanager:GetSecretValue"]
+    resources = [aws_secretsmanager_secret.auth.arn]
+  }
+
   statement {
     sid       = "ReadPlaidCredentials"
     effect    = "Allow"
@@ -152,6 +160,7 @@ resource "aws_lambda_function" "sync" {
       ATHENA_WORKGROUP      = aws_athena_workgroup.main.name
       GLUE_DATABASE         = aws_glue_catalog_database.finance.name
       PLAID_SECRET_ARN      = aws_secretsmanager_secret.plaid.arn
+      AUTH_SECRET_ARN       = aws_secretsmanager_secret.auth.arn
     }
   }
 

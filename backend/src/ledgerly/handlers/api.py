@@ -176,6 +176,75 @@ def list_accounts(_event: dict[str, Any]) -> tuple[int, dict[str, Any]]:
     }
 
 
+def _athena() -> Any:
+    from ledgerly.analytics import AthenaClient
+
+    cfg = get_config()
+    return AthenaClient(workgroup=cfg.athena_workgroup, database=cfg.glue_database)
+
+
+def list_transactions_route(event: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+    """The Ledger page. Filters map straight onto SQL predicates."""
+    from datetime import date
+
+    from ledgerly.analytics.serving import list_transactions
+
+    params = event.get("queryStringParameters") or {}
+
+    # Validate dates before they reach a statement.
+    for key in ("from", "to"):
+        if params.get(key):
+            try:
+                date.fromisoformat(params[key])
+            except ValueError:
+                return 400, {"error": "invalid_date", "field": key}
+
+    try:
+        limit = int(params.get("limit", 200))
+    except ValueError:
+        return 400, {"error": "invalid_limit"}
+
+    return 200, list_transactions(
+        _athena(),
+        get_config().glue_database,
+        date_from=params.get("from"),
+        date_to=params.get("to"),
+        account_id=params.get("account"),
+        category=params.get("category"),
+        transaction_type=params.get("type"),
+        search=params.get("search"),
+        limit=limit,
+    )
+
+
+def dashboard_route(_event: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+    """The Overview page.
+
+    Net worth comes from DynamoDB account balances, not Athena: it is current
+    operational state, not history, and the accounts table already holds it.
+    """
+    from datetime import date
+
+    from ledgerly.analytics.serving import dashboard
+    from ledgerly.storage import AccountRepository
+
+    cfg = get_config()
+    today = date.today()
+    accounts = AccountRepository(cfg.accounts_table).list_all()
+    net_worth = sum(a.net_worth_contribution for a in accounts)
+
+    body = dashboard(
+        _athena(),
+        cfg.glue_database,
+        month_start=today.replace(day=1).isoformat(),
+        today=today.isoformat(),
+    )
+    body["net_worth"] = str(net_worth)
+    body["account_count"] = len(accounts)
+    body["month"] = today.strftime("%B %Y")
+    return 200, body
+
+
 def cash_flow_report(event: dict[str, Any]) -> tuple[int, dict[str, Any]]:
     """Cash-flow report, Sankey-shaped.
 
@@ -212,7 +281,8 @@ def cash_flow_report(event: dict[str, Any]) -> tuple[int, dict[str, Any]]:
         "total_income": str(report.total_income),
         "total_expenses": str(report.total_expenses),
         "net_income": str(report.net_income),
-        "savings_rate": str(report.savings_rate),
+        # null when the ratio is not meaningful — the UI renders "—"
+        "savings_rate": str(report.savings_rate) if report.savings_rate is not None else None,
         "sankey": report.to_sankey(),
     }
 
@@ -222,6 +292,8 @@ ROUTES: dict[tuple[str, str], Handler] = {
     ("POST", "/auth/login"): login,
     ("GET", "/auth/session"): session,
     ("GET", "/accounts"): list_accounts,
+    ("GET", "/transactions"): list_transactions_route,
+    ("GET", "/dashboard"): dashboard_route,
     ("GET", "/reports/cash-flow"): cash_flow_report,
     ("GET", "/health"): health,
     ("GET", "/ready"): readiness,

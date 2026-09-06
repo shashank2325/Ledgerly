@@ -1,15 +1,17 @@
 import { useNavigate } from "react-router-dom";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Money } from "@/components/ui/Money";
-import { ComputedAt, Section } from "@/components/ui/primitives";
-import { Sparkline } from "@/components/charts/Sparkline";
+import { Section } from "@/components/ui/primitives";
 import { CategoryBars } from "@/components/charts/CategoryBars";
 import { CashFlowBars } from "@/components/charts/CashFlowBars";
 import { TransactionRow } from "@/components/ledger/TransactionRow";
 import { TransferPair } from "@/components/ledger/TransferPair";
-import { accountName, buildLedger, mockDashboard, mockTransactions, mockTransferGroups } from "@/api/mock";
-import { relativeTime } from "@/utils/date";
+import { api } from "@/api/client";
+import { useApi } from "@/hooks/useApi";
+import { buildLedger } from "@/utils/ledger";
+import { ErrorState, SkeletonRows } from "@/components/ui/primitives";
 import { parseAmount } from "@/utils/money";
+import type { Account } from "@/types";
 
 /**
  * Single column, top to bottom, decreasing importance (DESIGN.md §4).
@@ -17,18 +19,42 @@ import { parseAmount } from "@/utils/money";
  */
 export function Overview() {
   const navigate = useNavigate();
-  const d = mockDashboard;
+  const { data: d, loading, error, refetch } = useApi(() => api.getDashboard(), []);
+  const { data: recentData } = useApi(() => api.getTransactions({ limit: 12 }), []);
+  const { data: accountsData } = useApi(() => api.getAccounts(), []);
 
-  const entries = buildLedger(mockTransactions, mockTransferGroups);
+  const accountName = (id: string) => {
+    const account = (accountsData?.accounts ?? []).find((a: Account) => a.account_id === id);
+    return account ? `${account.name} ··${account.mask ?? ""}` : id;
+  };
+
+  if (loading) {
+    return (
+      <>
+        <PageHeader title="Overview" />
+        <SkeletonRows count={10} />
+      </>
+    );
+  }
+  if (error || !d) {
+    return (
+      <>
+        <PageHeader title="Overview" />
+        <ErrorState reason={error?.message ?? "No data"} onRetry={refetch} />
+      </>
+    );
+  }
+
+  const entries = buildLedger(recentData?.transactions ?? [], recentData?.transfer_groups ?? []);
   const recent = entries.slice(0, 6);
-  const suggested = mockTransferGroups.filter((g) => g.status === "SUGGESTED");
-  const uncategorized = mockTransactions.filter(
+  const suggested = (recentData?.transfer_groups ?? []).filter((g) => g.status === "SUGGESTED");
+  const uncategorized = (recentData?.transactions ?? []).filter(
     (t) => !t.category && t.transaction_type !== "TRANSFER",
   );
 
   return (
     <>
-      <PageHeader title="Overview" meta="September 2026" />
+      <PageHeader title="Overview" meta={d.month} />
 
       {/* ── Net worth — the one number that matters most ──────────────────── */}
       <section className="pb-8">
@@ -37,13 +63,14 @@ export function Overview() {
             <div className="t-label mb-2">Net worth</div>
             <Money amount={d.net_worth} size="lg" exact={false} />
             <div className="mt-1.5 flex items-baseline gap-2">
-              <Money amount={d.net_worth_change_month} type="INCOME" size="sm" exact={false} />
-              <span className="t-small text-ink-faint">this month</span>
+              <span className="t-small text-ink-faint">
+                across {d.account_count} connected {d.account_count === 1 ? "account" : "accounts"}
+              </span>
             </div>
           </div>
-          <div className="w-[280px] text-ink-muted shrink-0 pt-2">
-            <Sparkline data={d.net_worth_series} height={48} />
-          </div>
+          {/* No trend line yet: net worth over time needs the daily balance
+              snapshot table, which is not being populated. Showing a fabricated
+              series would be worse than showing none (DESIGN.md §3.8). */}
         </div>
       </section>
 
@@ -65,13 +92,16 @@ export function Overview() {
             </button>
           ))}
         </div>
-        <p className="mt-3 t-small text-ink-faint">
-          {/* State the exclusion explicitly — it is the product's core claim. */}
-          Excludes <span className="text-transfer">$4,000.00</span> in transfers between your own
-          accounts.
-        </p>
+        {parseAmount(d.month_transfers) > 0 && (
+          <p className="mt-3 t-small text-ink-faint">
+            {/* State the exclusion explicitly — it is the product's core claim. */}
+            Excludes <span className="text-transfer">${parseAmount(d.month_transfers).toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>{" "}
+            in transfers between your own accounts.
+          </p>
+        )}
       </Section>
 
+      {d.cash_flow.length > 0 && (
       <Section title="Cash flow">
         <CashFlowBars data={d.cash_flow} />
         <div className="mt-3 flex gap-4 t-small text-ink-faint">
@@ -83,13 +113,16 @@ export function Overview() {
           </span>
         </div>
       </Section>
+      )}
 
+      {d.spending_by_category.length > 0 && (
       <Section title="Spending by category">
         <CategoryBars
           data={d.spending_by_category}
           onSelect={(c) => navigate(`/app/ledger?category=${encodeURIComponent(c)}`)}
         />
       </Section>
+      )}
 
       <Section
         title="Recent activity"
@@ -149,10 +182,8 @@ export function Overview() {
       )}
 
       <footer className="pt-6 rule-t">
-        <ComputedAt when={relativeTime(d.computed_at)} />
-        {" · "}
         <span className="t-small text-ink-faint">
-          {mockTransactions.filter((t) => parseAmount(t.amount) !== 0).length} transactions this month
+          Live from Athena · {d.account_count} accounts
         </span>
       </footer>
     </>

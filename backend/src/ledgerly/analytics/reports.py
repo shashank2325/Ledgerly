@@ -43,11 +43,22 @@ class CashFlowReport:
     date_to: str
 
     @property
-    def savings_rate(self) -> Decimal:
-        """Share of income not spent. Zero income means no meaningful rate —
-        return 0 rather than dividing by zero or reporting 100%."""
+    def savings_rate(self) -> Decimal | None:
+        """Share of income not spent, or None when the figure is meaningless.
+
+        The ratio is only interpretable when income is the dominant term. With
+        $33.76 of income against $63,896 of spending it evaluates to
+        -189,167%, which is arithmetically correct and communicates nothing —
+        the reader learns less than from the two raw numbers.
+
+        Returning None lets the UI show "—" instead of a figure that looks like
+        a rendering bug. The threshold is deliberately generous: spending up to
+        10x income still yields a rate (-900%), which is extreme but readable.
+        """
         if self.total_income <= 0:
-            return Decimal("0")
+            return None
+        if self.total_expenses > self.total_income * 10:
+            return None
         return (self.net_income / self.total_income * 100).quantize(Decimal("0.1"))
 
     def to_sankey(self) -> dict[str, Any]:
@@ -112,21 +123,44 @@ def cash_flow(
         ORDER BY total DESC
     """)
 
+    # Refunds NET AGAINST their own category rather than counting as income.
+    # A $500 airline credit did not earn you $500 — it reduced what that trip
+    # cost. Reporting it as income would inflate both income and spending by
+    # the same amount and make the savings rate meaningless.
     income: list[dict[str, Any]] = []
-    expense: list[dict[str, Any]] = []
+    expense_by_category: dict[str | None, dict[str, Any]] = {}
+    refunds: dict[str | None, Decimal] = {}
+
     for row in rows:
-        entry = {
-            "category": row["category"],
-            "amount": row["total"] or Decimal("0"),
-            "count": row["txn_count"],
-        }
-        # A refund is money returning, so it belongs on the income side rather
-        # than as negative spending — otherwise a large refund can make a
-        # category's spend appear negative.
-        if row["transaction_type"] in ("INCOME", "REFUND"):
-            income.append(entry)
+        amount = row["total"] or Decimal("0")
+        category = row["category"]
+        if row["transaction_type"] == "INCOME":
+            income.append({"category": category, "amount": amount, "count": row["txn_count"]})
+        elif row["transaction_type"] == "REFUND":
+            refunds[category] = refunds.get(category, Decimal("0")) + amount
         else:
-            expense.append(entry)
+            entry = expense_by_category.setdefault(
+                category, {"category": category, "amount": Decimal("0"), "count": 0}
+            )
+            entry["amount"] += amount
+            entry["count"] += row["txn_count"]
+
+    for category, refunded in refunds.items():
+        entry = expense_by_category.setdefault(
+            category, {"category": category, "amount": Decimal("0"), "count": 0}
+        )
+        entry["amount"] -= refunded
+
+    # A category refunded to zero (or below) contributed no spending; dropping
+    # it avoids a zero-width Sankey ribbon and a meaningless row. Over-refunds
+    # are clamped rather than rendered as negative spending, which a Sankey
+    # cannot express.
+    expense = sorted(
+        (e for e in expense_by_category.values() if e["amount"] > 0),
+        key=lambda e: e["amount"],
+        reverse=True,
+    )
+    income.sort(key=lambda e: e["amount"], reverse=True)
 
     def collapse(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
         if len(entries) <= MAX_CATEGORIES:

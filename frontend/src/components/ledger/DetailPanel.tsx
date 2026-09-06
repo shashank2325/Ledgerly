@@ -1,15 +1,22 @@
 import { Money } from "@/components/ui/Money";
 import { formatDateLong } from "@/utils/date";
-import { accountName } from "@/api/mock";
 import type { Transaction } from "@/types";
 
 /** Right-side detail panel. Shows the full normalized record and — behind a
  *  disclosure — the raw source, expressing the "traceable to source"
  *  principle at the row level (DESIGN.md §1). */
-export function DetailPanel({ txn, onClose }: { txn: Transaction; onClose: () => void }) {
+export function DetailPanel({
+  txn,
+  accountName,
+  onClose,
+}: {
+  txn: Transaction;
+  accountName?: string;
+  onClose: () => void;
+}) {
   const rows: [string, React.ReactNode][] = [
     ["Date", formatDateLong(txn.transaction_date)],
-    ["Account", accountName(txn.account_id)],
+    ["Account", accountName ?? txn.account_id],
     ["Category", txn.category ? `${txn.category}${txn.subcategory ? ` · ${txn.subcategory}` : ""}` : "Uncategorized"],
     ["Type", <span className={txn.transaction_type === "TRANSFER" ? "text-transfer" : ""}>{txn.transaction_type}</span>],
     ["Status", txn.is_pending ? <span className="text-pending">Pending</span> : "Posted"],

@@ -5,6 +5,7 @@ import { Section } from "@/components/ui/primitives";
 import { api } from "@/api/client";
 import { useApi } from "@/hooks/useApi";
 import { ConnectButton } from "@/components/plaid/ConnectButton";
+import { RemoveConnection } from "@/components/accounts/RemoveConnection";
 import { EmptyState, ErrorState, SkeletonRows } from "@/components/ui/primitives";
 import { relativeTime } from "@/utils/date";
 import type { Account } from "@/types";
@@ -90,7 +91,19 @@ export function Accounts() {
       <Section title="Assets">
         {byInstitution(assets).map(([institution, list]) => (
           <div key={institution} className="mb-5 last:mb-0">
-            <div className="t-small text-ink-faint mb-1">{institution}</div>
+            <div className="flex items-baseline justify-between mb-1 gap-4">
+              <span className="t-small text-ink-faint">{institution}</span>
+              {list[0]?.item_id && (
+                <RemoveConnection
+                  itemId={list[0].item_id}
+                  institutionName={institution}
+                  accountCount={
+                    accounts.filter((a) => a.item_id === list[0]!.item_id).length
+                  }
+                  onRemoved={refetch}
+                />
+              )}
+            </div>
             {list.map((a) => (
               <AccountRow key={a.account_id} account={a}
                 onClick={() => navigate(`/app/ledger?account=${a.account_id}`)} />
@@ -108,7 +121,19 @@ export function Accounts() {
       <Section title="Liabilities">
         {byInstitution(liabilities).map(([institution, list]) => (
           <div key={institution} className="mb-5 last:mb-0">
-            <div className="t-small text-ink-faint mb-1">{institution}</div>
+            <div className="flex items-baseline justify-between mb-1 gap-4">
+              <span className="t-small text-ink-faint">{institution}</span>
+              {list[0]?.item_id && (
+                <RemoveConnection
+                  itemId={list[0].item_id}
+                  institutionName={institution}
+                  accountCount={
+                    accounts.filter((a) => a.item_id === list[0]!.item_id).length
+                  }
+                  onRemoved={refetch}
+                />
+              )}
+            </div>
             {list.map((a) => (
               <AccountRow key={a.account_id} account={a}
                 onClick={() => navigate(`/app/ledger?account=${a.account_id}`)} />

@@ -46,6 +46,7 @@ export function formatMoney(
     signed?: boolean;
     arrow?: boolean;
     forceSign?: boolean;
+    bareNegative?: boolean;
   } = {},
 ): MoneyParts {
   const {
@@ -54,6 +55,7 @@ export function formatMoney(
     signed = false,
     arrow = false,
     forceSign = false,
+    bareNegative = false,
   } = opts;
 
   const value = Number.parseFloat(amount);
@@ -66,11 +68,19 @@ export function formatMoney(
   if (forceSign) sign = safe < 0 ? "\u2212" : "+";
   else if (arrow) sign = "→";
   else if (signed && safe > 0) sign = "+";
-  // Outflows render bare. A minus sign on every expense is visual noise in a
-  // ledger where most rows are expenses; the column context carries it.
+  else if (safe < 0 && !bareNegative) sign = "\u2212";
+  // `bareNegative` is set for EXPENSE rows only. In a ledger column where most
+  // rows are outflows, a minus on every line is noise the column already
+  // carries. Everywhere else the sign is load-bearing, and omitting it lies:
+  // -$154,328 of net worth rendered as "$154,328" reads as wealth, not debt.
 
-  const whole = Math.floor(exact ? magnitude : Math.round(magnitude)).toLocaleString("en-US");
-  const fraction = exact ? `.${magnitude.toFixed(2).split(".")[1]}` : "";
+  // Split the already-rounded TEXT, never the raw float. Flooring the whole
+  // part while rounding the cents independently disagrees on the carry: 1.999
+  // would floor to 1 and round to ".00", printing $1.00 for what is $2.00.
+  const text = exact ? magnitude.toFixed(2) : `${Math.round(magnitude)}`;
+  const [wholeText = "0", fractionText] = text.split(".");
+  const whole = Number(wholeText).toLocaleString("en-US");
+  const fraction = fractionText ? `.${fractionText}` : "";
 
   return { sign, symbol: currencySymbol(currency), whole, fraction };
 }

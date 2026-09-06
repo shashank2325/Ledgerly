@@ -29,7 +29,10 @@ const LEFT_ZONE = 172; // label gutter: category name + right-aligned amount
 const RIGHT_ZONE = 232;
 const HEADER = 26; // band above the plot for middle-column labels
 const LABEL_H = 18;
-const LABEL_STEP = 16; // minimum distance between two label baselines
+/** Minimum distance between two label centres. Must be at least LABEL_H, or
+ *  crowded labels are "pushed apart" to a spacing narrower than they are tall
+ *  and still overlap. */
+const LABEL_STEP = LABEL_H;
 const TARGET_H = 400;
 const MIN_W = 720; // below this the chart scrolls rather than crushes
 
@@ -79,7 +82,7 @@ const STROKE: Record<FlowKind, string> = {
  *  minus on every expense is noise in a ledger where most rows are expenses. */
 const MONEY_TYPE: Record<FlowKind, TransactionType | undefined> = {
   income: "INCOME",
-  expense: undefined,
+  expense: "EXPENSE", // ink, and the only type that renders an outflow bare
   net: "TRANSFER", // violet; forceSign suppresses the → glyph
 };
 
@@ -197,7 +200,14 @@ function layout(data: SankeyData, width: number): Layout | null {
     let y = 0;
     for (const n of byColumn.get(c) ?? []) {
       const h = heights.get(n.id) ?? MIN_NODE;
-      const inboundH = thickOf(inbound.get(n.id));
+      // What actually funds this node: the flow arriving at it, or — for a
+      // column-0 source, which has nothing upstream — its own value. Treating
+      // "no inbound link" as "fully funded" would draw an Income node in a
+      // period with NO income as a solid, fully-backed bar, which is precisely
+      // the case the shortfall exists to show.
+      const funded = inbound.has(n.id)
+        ? thickOf(inbound.get(n.id))
+        : parseAmount(n.value) * scale;
       placed.push({
         id: n.id,
         label: n.label,
@@ -207,7 +217,7 @@ function layout(data: SankeyData, width: number): Layout | null {
         x: xFor(n.column),
         y,
         h,
-        filled: inbound.has(n.id) ? Math.min(h, inboundH) : h,
+        filled: Math.min(h, funded),
         labelY: y + h / 2,
       });
       y += h + NODE_GAP;
