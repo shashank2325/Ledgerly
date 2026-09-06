@@ -1,7 +1,8 @@
 # ── Secrets & credentials — NEVER commit ────────────────────────────
 .env
 .env.*
-!.env.example
+# Example files carry no values and document what a fresh clone must supply.
+!.env*.example
 *.pem
 *.key
 credentials
