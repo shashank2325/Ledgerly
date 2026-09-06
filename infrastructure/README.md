@@ -83,6 +83,47 @@ transitions and transfer patterns the pipeline has to handle. Switch to producti
 connecting a real bank in Phase 6.
 
 
+## Running a sync
+
+The scheduled pull is **disabled by default** so nothing runs unattended and
+nothing costs money while the pipeline is being built. Sync happens only when you
+ask for it:
+
+```bash
+./scripts/sync.sh          # pull now
+./scripts/sync.sh --logs   # pull, then tail the Lambda logs
+```
+
+Or directly:
+
+```bash
+aws lambda invoke --function-name ledgerly-dev-sync \
+  --payload '{"source":"manual"}' --cli-binary-format raw-in-base64-out /dev/stdout
+```
+
+Each run is **incremental**: the stored Plaid cursor is sent with the request, so
+only records added, modified, or removed since last time come back. There is no
+full refresh. Running it twice in a row is a no-op — verified, 98 rows stayed 98
+rows.
+
+To turn the timer on later, set in `terraform.tfvars`:
+
+```hcl
+sync_schedule_enabled = true
+sync_schedule         = "rate(3 hours)"
+```
+
+The EventBridge rule already exists in a DISABLED state, so enabling it changes
+one field rather than creating infrastructure.
+
+### First-time setup of the analytical tables
+
+```bash
+curl -X POST "$(terraform output -raw api_url)/sync/schemas"
+```
+
+Creates the Iceberg tables from `data/schemas/*.sql`. Idempotent.
+
 ## What exists after Phase 2
 
 | Resource | Name | Purpose |

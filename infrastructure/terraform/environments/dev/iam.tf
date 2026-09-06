@@ -54,6 +54,60 @@ data "aws_iam_policy_document" "api_lambda" {
     ]
   }
 
+  # ── Analytical reads ──────────────────────────────────────────────────────
+  # Reports aggregate over the full transaction history, which is exactly what
+  # Athena is for (SPEC §8). Read-only: the API can query the curated layer but
+  # cannot mutate it — only the sync Lambda writes.
+  statement {
+    sid    = "AthenaRead"
+    effect = "Allow"
+    actions = [
+      "athena:StartQueryExecution",
+      "athena:GetQueryExecution",
+      "athena:GetQueryResults",
+      "athena:StopQueryExecution",
+      "athena:GetWorkGroup",
+    ]
+    resources = [aws_athena_workgroup.main.arn]
+  }
+
+  statement {
+    sid       = "AthenaResults"
+    effect    = "Allow"
+    actions   = ["s3:PutObject", "s3:GetObject", "s3:ListBucket", "s3:GetBucketLocation"]
+    resources = [
+      aws_s3_bucket.athena_results.arn,
+      "${aws_s3_bucket.athena_results.arn}/*",
+    ]
+  }
+
+  # Reading Iceberg data requires reading its metadata and the underlying files.
+  statement {
+    sid       = "CuratedRead"
+    effect    = "Allow"
+    actions   = ["s3:GetObject"]
+    resources = ["${aws_s3_bucket.data.arn}/curated/*"]
+  }
+
+  statement {
+    sid       = "CuratedList"
+    effect    = "Allow"
+    actions   = ["s3:ListBucket", "s3:GetBucketLocation"]
+    resources = [aws_s3_bucket.data.arn]
+  }
+
+  statement {
+    sid       = "GlueRead"
+    effect    = "Allow"
+    actions   = ["glue:GetDatabase", "glue:GetDatabases", "glue:GetTable", "glue:GetTables",
+                 "glue:GetPartition", "glue:GetPartitions"]
+    resources = [
+      "arn:aws:glue:${var.aws_region}:${local.account_id}:catalog",
+      aws_glue_catalog_database.finance.arn,
+      "arn:aws:glue:${var.aws_region}:${local.account_id}:table/${aws_glue_catalog_database.finance.name}/*",
+    ]
+  }
+
   # Rules are user-editable through the API; accounts are not.
   statement {
     sid    = "WriteRules"

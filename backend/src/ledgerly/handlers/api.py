@@ -111,9 +111,51 @@ def list_accounts(_event: dict[str, Any]) -> tuple[int, dict[str, Any]]:
     }
 
 
+def cash_flow_report(event: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+    """Cash-flow report, Sankey-shaped.
+
+    Aggregation happens in Athena — this is exactly the long-range analytical
+    query Athena exists for, not an operational read (SPEC §8).
+    """
+    from datetime import date
+
+    from ledgerly.analytics import AthenaClient, cash_flow
+
+    params = event.get("queryStringParameters") or {}
+    today = date.today()
+    date_from = params.get("from") or today.replace(month=1, day=1).isoformat()
+    date_to = params.get("to") or today.isoformat()
+
+    # Validate rather than interpolate blindly: these reach a SQL statement.
+    for value in (date_from, date_to):
+        try:
+            date.fromisoformat(value)
+        except ValueError:
+            return 400, {"error": "invalid_date", "detail": f"{value!r} is not YYYY-MM-DD"}
+
+    cfg = get_config()
+    report = cash_flow(
+        AthenaClient(workgroup=cfg.athena_workgroup, database=cfg.glue_database),
+        date_from=date_from,
+        date_to=date_to,
+    )
+
+    return 200, {
+        "date_from": report.date_from,
+        "date_to": report.date_to,
+        # Money as strings — exact across the wire, never a JS float.
+        "total_income": str(report.total_income),
+        "total_expenses": str(report.total_expenses),
+        "net_income": str(report.net_income),
+        "savings_rate": str(report.savings_rate),
+        "sankey": report.to_sankey(),
+    }
+
+
 ROUTES: dict[tuple[str, str], Handler] = {
     ("GET", "/"): health,
     ("GET", "/accounts"): list_accounts,
+    ("GET", "/reports/cash-flow"): cash_flow_report,
     ("GET", "/health"): health,
     ("GET", "/ready"): readiness,
 }

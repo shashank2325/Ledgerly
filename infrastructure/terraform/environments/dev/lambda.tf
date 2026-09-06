@@ -74,6 +74,8 @@ resource "aws_lambda_function" "api" {
       SYNC_RUNS_TABLE         = aws_dynamodb_table.sync_runs.name
       DATA_BUCKET             = aws_s3_bucket.data.id
       ATHENA_RESULTS_BUCKET   = aws_s3_bucket.athena_results.id
+      ATHENA_WORKGROUP        = aws_athena_workgroup.main.name
+      GLUE_DATABASE           = aws_glue_catalog_database.finance.name
       # Only the ARN — the API role cannot read this secret, and the value is
       # never passed through the environment (SPEC §32: no secrets in env vars).
       PLAID_SECRET_ARN        = aws_secretsmanager_secret.plaid.arn
