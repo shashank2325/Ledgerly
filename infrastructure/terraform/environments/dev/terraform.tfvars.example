@@ -1,0 +1,10 @@
+# Copy to terraform.tfvars and fill in. terraform.tfvars is gitignored.
+# NOTE: no Plaid credentials here — those go to Secrets Manager out-of-band.
+
+aws_region         = "us-east-1"
+environment        = "dev"
+log_retention_days = 14
+
+# Strongly recommended. Without this no budget alert is created.
+budget_alert_email = ""
+monthly_budget_usd = 10
