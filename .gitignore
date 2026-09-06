@@ -19,6 +19,10 @@ plaid_*.json
 crash.log
 override.tf
 override.tf.json
+# Saved plan files are binary, environment-specific, and can embed resource
+# attributes — never commit them.
+tfplan
+*.tfplan
 
 # ── Python ──────────────────────────────────────────────────────────
 __pycache__/
@@ -42,6 +46,7 @@ backend/layers/
 # ── Node / frontend ─────────────────────────────────────────────────
 node_modules/
 frontend/dist/
+*.tsbuildinfo
 .vite/
 *.local
 
