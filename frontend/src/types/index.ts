@@ -111,6 +111,47 @@ export interface MonthlyCashFlow {
   net: string;
 }
 
+/* ── Reports ───────────────────────────────────────────────────────────────
+   Mirrors `backend/src/ledgerly/analytics/reports.py`. */
+
+/** The only three meanings color is allowed to carry in a report (DESIGN.md
+ *  §3.2). Categories are never distinguished by hue — only by label. */
+export type FlowKind = "income" | "expense" | "net";
+
+export interface SankeyNode {
+  id: string;
+  label: string;
+  /** Money as a string. Parsed for LAYOUT GEOMETRY only, never arithmetic. */
+  value: string;
+  kind: FlowKind;
+  /** 0 = income sources, 1 = the single Income node, 2 = destinations. */
+  column: number;
+}
+
+export interface SankeyLink {
+  /** Node ids, not indices. */
+  source: string;
+  target: string;
+  value: string;
+  kind: FlowKind;
+}
+
+export interface SankeyData {
+  nodes: SankeyNode[];
+  links: SankeyLink[];
+}
+
+export interface CashFlowReport {
+  date_from: string;
+  date_to: string;
+  total_income: string;
+  total_expenses: string;
+  net_income: string;
+  /** Percentage, already ×100 by the backend. Not money — no currency symbol. */
+  savings_rate: string;
+  sankey: SankeyData;
+}
+
 export interface DashboardSummary {
   net_worth: string;
   net_worth_change_month: string;

@@ -7,6 +7,15 @@ export function parseLedgerDate(iso: string): Date {
   return new Date(y ?? 1970, (m ?? 1) - 1, d ?? 1);
 }
 
+/** Serialize a Date to the calendar-date form the API expects. Built from the
+ *  LOCAL fields — `toISOString()` converts to UTC first and can hand back
+ *  yesterday for anyone west of Greenwich. */
+export function toISODate(date: Date): string {
+  const m = `${date.getMonth() + 1}`.padStart(2, "0");
+  const d = `${date.getDate()}`.padStart(2, "0");
+  return `${date.getFullYear()}-${m}-${d}`;
+}
+
 export function formatDate(iso: string): string {
   return parseLedgerDate(iso).toLocaleDateString("en-US", {
     month: "short",

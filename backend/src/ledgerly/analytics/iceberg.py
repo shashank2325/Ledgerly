@@ -21,7 +21,7 @@ from decimal import Decimal
 from typing import Any
 
 from ledgerly.analytics.athena import AthenaClient
-from ledgerly.models import Transaction
+from ledgerly.models import Transaction, TransferGroup, TransferStatus
 
 logger = logging.getLogger(__name__)
 
@@ -211,3 +211,127 @@ WHERE transaction_id IN ({ids})
             removed += len(batch)
         logger.info("iceberg_removed count=%d", removed)
         return removed
+
+
+# ── Transfer groups ─────────────────────────────────────────────────────────
+
+TRANSFER_COLUMNS: tuple[str, ...] = (
+    "transfer_group_id",
+    "source_transaction_id", "source_account_id",
+    "destination_transaction_id", "destination_account_id",
+    "amount", "iso_currency_code",
+    "transfer_kind", "status", "confidence", "match_method", "date_gap_days",
+    "source_date", "destination_date",
+    "matched_at", "confirmed_at", "confirmed_by", "_processed_at",
+)
+
+
+class TransferWriter:
+    """Persists matched pairs and flags their legs (SPEC §17).
+
+    Two writes, in this order:
+      1. the group rows, so the pairing itself is recorded
+      2. the transaction legs, flipped to TRANSFER so they leave the
+         income/expense totals
+
+    If step 2 failed alone, the groups would exist while spending stayed
+    overstated — visible and repairable by re-running. The reverse order could
+    leave legs marked as transfers with no group explaining why, which is
+    strictly worse because nothing would point at the problem.
+    """
+
+    def __init__(self, client: AthenaClient, database: str) -> None:
+        self._client = client
+        self._db = database
+
+    def upsert_groups(self, groups: list[TransferGroup]) -> int:
+        if not groups:
+            return 0
+
+        written = 0
+        for start in range(0, len(groups), MERGE_BATCH_SIZE):
+            batch = groups[start : start + MERGE_BATCH_SIZE]
+            values = ",\n    ".join(
+                "("
+                + ", ".join(
+                    sql_literal(v)
+                    for v in (
+                        g.transfer_group_id,
+                        g.source_transaction_id, g.source_account_id,
+                        g.destination_transaction_id, g.destination_account_id,
+                        g.amount, g.iso_currency_code,
+                        str(g.transfer_kind), str(g.status), g.confidence,
+                        str(g.match_method), g.date_gap_days,
+                        g.source_date, g.destination_date,
+                        g.matched_at, g.confirmed_at, g.confirmed_by,
+                        datetime.utcnow(),
+                    )
+                )
+                + ")"
+                for g in batch
+            )
+            columns = ", ".join(TRANSFER_COLUMNS)
+            # A user decision must survive re-detection: if someone rejected a
+            # pair, the matcher proposing it again must not silently re-confirm
+            # it. Only non-REJECTED groups are updated.
+            updates = ",\n        ".join(
+                f"{c} = s.{c}" for c in TRANSFER_COLUMNS if c != "transfer_group_id"
+            )
+            self._client.execute(f"""
+MERGE INTO {self._db}.transfer_groups t
+USING (VALUES
+    {values}
+) AS s ({columns})
+ON t.transfer_group_id = s.transfer_group_id
+WHEN MATCHED AND t.status != 'REJECTED' THEN UPDATE SET
+        {updates}
+WHEN NOT MATCHED THEN INSERT ({columns})
+    VALUES ({", ".join(f"s.{c}" for c in TRANSFER_COLUMNS)})
+""".strip())
+            written += len(batch)
+        logger.info("transfer_groups_written count=%d", written)
+        return written
+
+    def mark_legs(self, groups: list[TransferGroup]) -> int:
+        """Flip confirmed legs to TRANSFER so they drop out of income/expense.
+
+        Only CONFIRMED groups. A SUGGESTED pair still shows as two ordinary
+        transactions — money is never removed from the totals on a guess.
+        """
+        confirmed = [g for g in groups if g.status is TransferStatus.CONFIRMED]
+        if not confirmed:
+            return 0
+
+        leg_ids: list[str] = []
+        for g in confirmed:
+            leg_ids += [g.source_transaction_id, g.destination_transaction_id]
+
+        for start in range(0, len(leg_ids), MERGE_BATCH_SIZE):
+            batch = leg_ids[start : start + MERGE_BATCH_SIZE]
+            ids = ", ".join(sql_literal(i) for i in batch)
+            # user_type_override is respected: a manual classification wins over
+            # automatic detection.
+            self._client.execute(f"""
+UPDATE {self._db}.transactions
+SET is_transfer = true,
+    transaction_type = 'TRANSFER',
+    _processed_at = {sql_literal(datetime.utcnow())}
+WHERE transaction_id IN ({ids})
+  AND status != 'REMOVED'
+  AND user_type_override = false
+""".strip())
+
+        # transfer_group_id is set per group so each leg points at its pair.
+        for g in confirmed:
+            ids = ", ".join(
+                sql_literal(i)
+                for i in (g.source_transaction_id, g.destination_transaction_id)
+            )
+            self._client.execute(f"""
+UPDATE {self._db}.transactions
+SET transfer_group_id = {sql_literal(g.transfer_group_id)}
+WHERE transaction_id IN ({ids}) AND user_type_override = false
+""".strip())
+
+        logger.info("transfer_legs_marked groups=%d legs=%d", len(confirmed), len(leg_ids))
+        return len(leg_ids)

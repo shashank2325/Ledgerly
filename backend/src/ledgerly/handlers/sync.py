@@ -75,13 +75,25 @@ def sync_all() -> dict[str, Any]:
         record_run(runs_table, result)
         results.append(result.to_dict())
 
+    detection = detect_transfers()
+
     return {
         "items_synced": len(results),
+        "transfer_detection": detection,
         "results": results,
         "total_added": sum(r["added"] for r in results),
         "total_removed": sum(r["removed"] for r in results),
         "total_superseded": sum(r["superseded"] for r in results),
     }
+
+
+def detect_transfers() -> dict[str, Any]:
+    """Pair transactions into transfers and reclassify their legs (SPEC §17)."""
+    from ledgerly.pipeline.detect import detect_and_persist
+
+    cfg = get_config()
+    accounts = AccountRepository(cfg.accounts_table).list_all()
+    return detect_and_persist(_athena(), cfg.glue_database, accounts)
 
 
 def bootstrap_schemas() -> dict[str, Any]:
@@ -108,6 +120,8 @@ def handler(event: dict[str, Any], context: Any = None) -> dict[str, Any]:
             body = sync_all()
         elif method == "POST" and path == "/sync/schemas":
             body = bootstrap_schemas()
+        elif method == "POST" and path == "/sync/detect-transfers":
+            body = detect_transfers()
         else:
             return _response(404, {"error": "not_found", "path": path})
 

@@ -6,7 +6,7 @@
  * backend (SPEC §3): the frontend displays results, it does not compute them.
  */
 
-import type { Account } from "@/types";
+import type { Account, CashFlowReport } from "@/types";
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? "";
 
@@ -66,6 +66,13 @@ export interface PlaidItem {
 
 export const api = {
   getAccounts: () => request<AccountsResponse>("/accounts"),
+
+  /** Cash-flow report, Sankey-shaped. Aggregation happens in Athena; the
+   *  frontend lays the result out and does not recompute any total. */
+  getCashFlowReport: (from: string, to: string) =>
+    request<CashFlowReport>(
+      `/reports/cash-flow?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+    ),
 
   getItems: () => request<{ items: PlaidItem[] }>("/plaid/items"),
 
