@@ -1,0 +1,56 @@
+# ── Secrets & credentials — NEVER commit ────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials
+secrets.json
+plaid_*.json
+
+# ── Terraform ───────────────────────────────────────────────────────
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log
+override.tf
+override.tf.json
+
+# ── Python ──────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+dist/
+build/
+.coverage
+htmlcov/
+
+# ── Lambda build artifacts ──────────────────────────────────────────
+*.zip
+backend/build/
+backend/layers/
+
+# ── Node / frontend ─────────────────────────────────────────────────
+node_modules/
+frontend/dist/
+.vite/
+*.local
+
+# ── Real financial data — never commit ──────────────────────────────
+data/samples/real/
+*.csv
+!data/samples/*.example.csv
+
+# ── OS / editor ─────────────────────────────────────────────────────
+.DS_Store
+.idea/
+.vscode/
+*.swp
