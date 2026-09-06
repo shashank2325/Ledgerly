@@ -1,0 +1,204 @@
+/* ============================================================================
+   Ledgerly design system — "Ledger"
+   Ink on paper. Hairlines, not boxes. Numbers are the typography.
+   Color is a fact, never a decoration.
+
+   Implements docs/DESIGN.md §3. That document is the contract; this file is
+   its only implementation. Do not introduce colors, sizes, or radii here that
+   are not in the spec.
+   ========================================================================= */
+
+@import "tailwindcss";
+
+/* Dark mode is class-driven (.dark on <html>) so the user can override the OS
+   preference. `useTheme` seeds the class from prefers-color-scheme on boot. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ── Palette ───────────────────────────────────────────────────────────────
+   Defined as raw custom properties so light/dark can swap them, then exposed
+   to Tailwind via `@theme inline` below. */
+:root {
+  /* Surfaces. Warm off-white, never #FFF — paper, not a screen. */
+  --c-canvas:      #FAFAF8;
+  --c-surface:     #FFFFFF;  /* only for genuinely floating things */
+  --c-rule:        #E6E4DE;
+  --c-rule-strong: #C9C6BE;
+
+  /* Ink */
+  --c-ink:         #1A1917;
+  --c-ink-muted:   #6B6862;
+  --c-ink-faint:   #9A968E;
+
+  /* Semantic — the ONLY color in the app.
+     Expenses are deliberately ink, not red: spending is the normal state of a
+     ledger, not an error. Red is reserved for things actually wrong. */
+  --c-income:      #2F6F4E;
+  --c-expense:     #1A1917;
+  --c-transfer:    #7A5CA8;  /* the signature color — our differentiator */
+  --c-pending:     #B07A29;
+  --c-negative:    #A33B2A;
+  --c-accent:      #7A5CA8;
+}
+
+.dark {
+  --c-canvas:      #171614;  /* warm near-black, matching the paper's warmth */
+  --c-surface:     #1F1E1B;
+  --c-rule:        #2E2C28;
+  --c-rule-strong: #423F39;
+
+  --c-ink:         #EDEBE6;
+  --c-ink-muted:   #A5A199;
+  --c-ink-faint:   #6E6A62;
+
+  /* Lightened to hold ≥4.5:1 against the dark canvas. */
+  --c-income:      #5FA87E;
+  --c-expense:     #EDEBE6;
+  --c-transfer:    #A98FD0;
+  --c-pending:     #D9A857;
+  --c-negative:    #D2705C;
+  --c-accent:      #A98FD0;
+}
+
+@theme inline {
+  --color-canvas:      var(--c-canvas);
+  --color-surface:     var(--c-surface);
+  --color-rule:        var(--c-rule);
+  --color-rule-strong: var(--c-rule-strong);
+  --color-ink:         var(--c-ink);
+  --color-ink-muted:   var(--c-ink-muted);
+  --color-ink-faint:   var(--c-ink-faint);
+  --color-income:      var(--c-income);
+  --color-expense:     var(--c-expense);
+  --color-transfer:    var(--c-transfer);
+  --color-pending:     var(--c-pending);
+  --color-negative:    var(--c-negative);
+  --color-accent:      var(--c-accent);
+
+  --font-sans: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", monospace;
+
+  /* Sharp corners are part of the identity. 2px on interactive controls only;
+     0 everywhere else. No pills. */
+  --radius-sm: 2px;
+}
+
+/* ── Base ─────────────────────────────────────────────────────────────────── */
+@layer base {
+  html {
+    background-color: var(--c-canvas);
+    /* Prevent iOS text inflation without disabling user zoom. */
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--c-canvas);
+    color: var(--c-ink);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Visible focus everywhere. Non-negotiable (DESIGN.md §3.9). */
+  :focus-visible {
+    outline: 2px solid var(--c-accent);
+    outline-offset: 2px;
+  }
+
+  /* No decorative chrome: no shadows, no elevation system, no card borders.
+     Structure comes from hairlines, whitespace, and alignment. */
+  hr {
+    border: 0;
+    border-top: 1px solid var(--c-rule);
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--c-accent) 22%, transparent);
+  }
+}
+
+/* ── Type scale (DESIGN.md §3.3) ──────────────────────────────────────────── */
+@layer components {
+  .t-display { font-size: 32px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.1; }
+  .t-h1      { font-size: 22px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.25; }
+  .t-h2      { font-size: 15px; font-weight: 600; line-height: 1.4; }
+  .t-body    { font-size: 14px; font-weight: 400; }
+  .t-small   { font-size: 12px; font-weight: 400; }
+
+  /* Section labels: uppercase, tracked, muted. Used for every column header
+     and section heading so the eye can skip them and land on the data. */
+  .t-label {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--c-ink-muted);
+  }
+
+  /* ── Numerals (DESIGN.md §3.4) ──────────────────────────────────────────
+     The load-bearing typographic decision. ALWAYS tabular so columns align on
+     the decimal. Plex does not default to tabular — it must be set. */
+  .t-num, .t-num-lg, .t-num-sm {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+  /* Display numerals use Plex SANS with tabular figures, not Mono.
+     Monospacing exists to align columns; a hero number has nothing to align
+     against, so it buys nothing and costs legibility — Plex Mono sets the
+     comma on a full advance width, which opens a visible gap ("$85 , 540") at
+     display sizes. Tabular figures are kept so the number does not reflow as
+     it updates. Mono remains the rule everywhere a column exists. */
+  .t-num-lg {
+    font-family: var(--font-sans);
+    font-size: 28px;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+  }
+  .t-num    { font-size: 14px; font-weight: 400; }
+  .t-num-sm { font-size: 12px; font-weight: 400; }
+
+  /* Units recede so magnitude reads first: the $ and the cents drop to faint,
+     one step down. Applied by the <Money> component, not by hand. */
+  .num-unit { color: var(--c-ink-faint); font-size: 0.85em; }
+
+  /* Pending amounts are italic + amber — they may still change. */
+  .num-pending { font-style: italic; color: var(--c-pending); }
+
+  /* ── Hairline structure — the card replacement ────────────────────────── */
+  .rule-t { border-top: 1px solid var(--c-rule); }
+  .rule-b { border-bottom: 1px solid var(--c-rule); }
+  .rule-r { border-right: 1px solid var(--c-rule); }
+  .rule-b-strong { border-bottom: 1px solid var(--c-rule-strong); }
+
+  /* Ledger rows: 40px tall — dense enough to scan 20 at once, loose enough to
+     click (DESIGN.md §3.5). */
+  .row {
+    height: 40px;
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid var(--c-rule);
+  }
+  .row-hover:hover { background: color-mix(in srgb, var(--c-ink) 3%, transparent); }
+
+  /* The only place a shadow is permitted: things that genuinely float. */
+  .floats {
+    background: var(--c-surface);
+    border: 1px solid var(--c-rule-strong);
+    box-shadow: 0 4px 16px color-mix(in srgb, var(--c-ink) 8%, transparent);
+  }
+
+  /* Loading: hairline skeleton at exact row height. No spinners, no shimmer. */
+  .skeleton {
+    background: color-mix(in srgb, var(--c-ink) 6%, transparent);
+    animation: skeleton-pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes skeleton-pulse { 0%,100% { opacity: 1 } 50% { opacity: 0.45 } }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
