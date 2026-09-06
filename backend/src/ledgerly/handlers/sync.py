@@ -30,13 +30,43 @@ from ledgerly.storage.raw import RawWriter
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
+JSON_HEADERS = {"content-type": "application/json"}
+
 
 def _response(status: int, body: dict[str, Any]) -> dict[str, Any]:
     return {
         "statusCode": status,
-        "headers": {"content-type": "application/json"},
+        "headers": JSON_HEADERS,
         "body": json.dumps(body, separators=(",", ":"), default=str),
     }
+
+
+
+def _bearer(event: dict[str, Any]) -> str | None:
+    headers = {k.lower(): v for k, v in (event.get("headers") or {}).items()}
+    value = headers.get("authorization", "")
+    return value[7:].strip() if value.lower().startswith("bearer ") else None
+
+
+def _require_session(event: dict[str, Any]) -> dict[str, Any] | None:
+    """Return an error response if the request lacks a valid session, else None.
+
+    Sync triggers Plaid calls and Athena queries, both of which cost money, so
+    HTTP invocation is closed. EventBridge invocations bypass this by design —
+    they carry no requestContext and are authenticated by IAM instead.
+    """
+    from ledgerly.auth import AuthError, verify_token
+
+    token = _bearer(event)
+    if not token:
+        return {"statusCode": 401, "headers": JSON_HEADERS,
+                "body": json.dumps({"error": "authentication_required"})}
+    try:
+        verify_token(token, secret_arn=get_config().auth_secret_arn)
+    except AuthError:
+        return {"statusCode": 401, "headers": JSON_HEADERS,
+                "body": json.dumps({"error": "invalid_or_expired_token"})}
+    return None
 
 
 def _athena() -> AthenaClient:
@@ -114,6 +144,13 @@ def handler(event: dict[str, Any], context: Any = None) -> dict[str, Any]:
     path = http.get("path", "/sync")
     # EventBridge invokes with no requestContext; treat that as a full sync.
     scheduled = "requestContext" not in event
+
+    # Scheduled invocations are authenticated by IAM, not a session token.
+    if not scheduled:
+        denied = _require_session(event)
+        if denied is not None:
+            logger.warning("unauthenticated_request path=%s", path)
+            return denied
 
     try:
         if scheduled or (method == "POST" and path == "/sync"):

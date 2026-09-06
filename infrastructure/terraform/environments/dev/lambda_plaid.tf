@@ -21,6 +21,14 @@ data "aws_iam_policy_document" "plaid_lambda" {
     resources = ["${aws_cloudwatch_log_group.plaid_lambda.arn}:*"]
   }
 
+  # Verifying the caller's session token.
+  statement {
+    sid       = "ReadAuthSecret"
+    effect    = "Allow"
+    actions   = ["secretsmanager:GetSecretValue"]
+    resources = [aws_secretsmanager_secret.auth.arn]
+  }
+
   # The Plaid application credentials. Only this role may read them.
   statement {
     sid       = "ReadPlaidCredentials"
@@ -114,6 +122,7 @@ resource "aws_lambda_function" "plaid" {
       SYNC_RUNS_TABLE  = aws_dynamodb_table.sync_runs.name
       DATA_BUCKET      = aws_s3_bucket.data.id
       PLAID_SECRET_ARN = aws_secretsmanager_secret.plaid.arn
+      AUTH_SECRET_ARN  = aws_secretsmanager_secret.auth.arn
     }
   }
 

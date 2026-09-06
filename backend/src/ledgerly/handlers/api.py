@@ -17,6 +17,7 @@ from collections.abc import Callable
 from typing import Any
 
 from ledgerly import __version__
+from ledgerly.auth import AuthError, issue_token, verify_credentials, verify_token
 from ledgerly.config import get_config
 
 logger = logging.getLogger()
@@ -25,6 +26,18 @@ logger.setLevel(logging.INFO)
 JSON_HEADERS = {"content-type": "application/json"}
 
 Handler = Callable[[dict[str, Any]], tuple[int, dict[str, Any]]]
+
+
+def _parse_body(event: dict[str, Any]) -> dict[str, Any]:
+    raw = event.get("body") or "{}"
+    if event.get("isBase64Encoded"):
+        import base64
+        raw = base64.b64decode(raw).decode()
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
 
 
 def _response(status: int, body: dict[str, Any]) -> dict[str, Any]:
@@ -36,6 +49,58 @@ def _response(status: int, body: dict[str, Any]) -> dict[str, Any]:
 
 
 # ── Routes ──────────────────────────────────────────────────────────────────
+
+
+# Routes reachable without a session. Everything else requires one — the
+# default is CLOSED, so a new endpoint is protected unless deliberately opened.
+PUBLIC_ROUTES: frozenset[tuple[str, str]] = frozenset({
+    ("GET", "/"),
+    ("GET", "/health"),
+    ("GET", "/ready"),
+    ("POST", "/auth/login"),
+})
+
+
+def _bearer(event: dict[str, Any]) -> str | None:
+    # API Gateway lowercases header names in payload format 2.0, but be lenient.
+    headers = {k.lower(): v for k, v in (event.get("headers") or {}).items()}
+    value = headers.get("authorization", "")
+    return value[7:].strip() if value.lower().startswith("bearer ") else None
+
+
+def login(event: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+    """Exchange credentials for a session token.
+
+    Returns an identical error for every failure mode so the response cannot be
+    used to enumerate valid usernames.
+    """
+    body = _parse_body(event)
+    cfg = get_config()
+
+    try:
+        username = verify_credentials(
+            str(body.get("username", "")),
+            str(body.get("password", "")),
+            secret_arn=cfg.auth_secret_arn,
+        )
+    except AuthError:
+        return 401, {"error": "invalid_credentials"}
+
+    token, expires_at = issue_token(username, secret_arn=cfg.auth_secret_arn)
+    return 200, {"token": token, "expires_at": expires_at, "username": username}
+
+
+def session(event: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+    """Whether the presented token is still valid — used on app boot so a stale
+    token shows the login screen instead of a wall of failed requests."""
+    token = _bearer(event)
+    if not token:
+        return 401, {"error": "no_token"}
+    try:
+        username = verify_token(token, secret_arn=get_config().auth_secret_arn)
+    except AuthError as exc:
+        return 401, {"error": "invalid_token", "reason": str(exc)}
+    return 200, {"username": username, "valid": True}
 
 
 def health(_event: dict[str, Any]) -> tuple[int, dict[str, Any]]:
@@ -154,6 +219,8 @@ def cash_flow_report(event: dict[str, Any]) -> tuple[int, dict[str, Any]]:
 
 ROUTES: dict[tuple[str, str], Handler] = {
     ("GET", "/"): health,
+    ("POST", "/auth/login"): login,
+    ("GET", "/auth/session"): session,
     ("GET", "/accounts"): list_accounts,
     ("GET", "/reports/cash-flow"): cash_flow_report,
     ("GET", "/health"): health,
@@ -185,6 +252,15 @@ def handler(event: dict[str, Any], context: Any = None) -> dict[str, Any]:
     route = ROUTES.get((method, path))
 
     try:
+        if route is not None and (method, path) not in PUBLIC_ROUTES:
+            token = _bearer(event)
+            if not token:
+                return _response(401, {"error": "authentication_required"})
+            try:
+                verify_token(token, secret_arn=get_config().auth_secret_arn)
+            except AuthError:
+                return _response(401, {"error": "invalid_or_expired_token"})
+
         if route is None:
             status, body = 404, {"error": "not_found", "path": path}
         else:

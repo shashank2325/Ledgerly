@@ -54,6 +54,33 @@ def _parse_body(event: dict[str, Any]) -> dict[str, Any]:
     return parsed if isinstance(parsed, dict) else {}
 
 
+
+def _bearer(event: dict[str, Any]) -> str | None:
+    headers = {k.lower(): v for k, v in (event.get("headers") or {}).items()}
+    value = headers.get("authorization", "")
+    return value[7:].strip() if value.lower().startswith("bearer ") else None
+
+
+def _require_session(event: dict[str, Any]) -> dict[str, Any] | None:
+    """Return an error response if the request lacks a valid session, else None.
+
+    This handler manages Plaid connections and can spend real money in
+    production, so it is closed by default with no public routes at all.
+    """
+    from ledgerly.auth import AuthError, verify_token
+
+    token = _bearer(event)
+    if not token:
+        return {"statusCode": 401, "headers": JSON_HEADERS,
+                "body": json.dumps({"error": "authentication_required"})}
+    try:
+        verify_token(token, secret_arn=get_config().auth_secret_arn)
+    except AuthError:
+        return {"statusCode": 401, "headers": JSON_HEADERS,
+                "body": json.dumps({"error": "invalid_or_expired_token"})}
+    return None
+
+
 def _client() -> PlaidClient:
     cfg = get_config()
     return PlaidClient(get_plaid_credentials(cfg.plaid_secret_arn))
@@ -203,6 +230,11 @@ def handler(event: dict[str, Any], context: Any = None) -> dict[str, Any]:
     method = http.get("method", "GET")
     path = http.get("path", "/")
     request_id = getattr(context, "aws_request_id", None) or "-"
+
+    denied = _require_session(event)
+    if denied is not None:
+        logger.warning("unauthenticated_request path=%s", path)
+        return denied
 
     route = ROUTES.get((method, path))
 

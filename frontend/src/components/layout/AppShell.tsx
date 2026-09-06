@@ -1,16 +1,21 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { useTheme } from "@/hooks/useTheme";
+import { useAuth } from "@/hooks/useAuth";
 
-/** Four top-level destinations. Resist adding a fifth (DESIGN.md §4). */
+/** Top-level destinations (DESIGN.md §4). Reports sits between Ledger and
+ *  Accounts: it is a *view over* the ledger, so it belongs next to it, and
+ *  above Accounts, which is reference data rather than analysis. */
 const NAV = [
-  { to: "/", label: "Overview", end: true },
-  { to: "/ledger", label: "Ledger" },
-  { to: "/accounts", label: "Accounts" },
-  { to: "/settings", label: "Settings" },
+  { to: "/app", label: "Overview", end: true },
+  { to: "/app/ledger", label: "Ledger" },
+  { to: "/app/reports", label: "Reports" },
+  { to: "/app/accounts", label: "Accounts" },
+  { to: "/app/settings", label: "Settings" },
 ];
 
 export function AppShell() {
   const { theme, toggle } = useTheme();
+  const { username, logout } = useAuth();
 
   return (
     <div className="min-h-screen flex bg-canvas text-ink">
@@ -50,13 +55,24 @@ export function AppShell() {
           ))}
         </ul>
 
-        <button
-          onClick={toggle}
-          className="t-small text-ink-faint hover:text-ink-muted text-left transition-colors"
-          aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
-        >
-          {theme === "dark" ? "Light" : "Dark"}
-        </button>
+        <div className="flex flex-col gap-2 items-start">
+          <button
+            onClick={toggle}
+            className="t-small text-ink-faint hover:text-ink-muted transition-colors"
+            aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+          >
+            {theme === "dark" ? "Light" : "Dark"}
+          </button>
+          <div className="flex items-baseline gap-2 pt-2 rule-t w-full">
+            <span className="t-small text-ink-faint truncate">{username ?? "—"}</span>
+            <button
+              onClick={logout}
+              className="t-small text-ink-faint hover:text-ink-muted transition-colors ml-auto"
+            >
+              Sign out
+            </button>
+          </div>
+        </div>
       </nav>
 
       {/* Content left-aligned within the pane, not centered — centered content

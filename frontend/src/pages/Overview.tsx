@@ -87,14 +87,14 @@ export function Overview() {
       <Section title="Spending by category">
         <CategoryBars
           data={d.spending_by_category}
-          onSelect={(c) => navigate(`/ledger?category=${encodeURIComponent(c)}`)}
+          onSelect={(c) => navigate(`/app/ledger?category=${encodeURIComponent(c)}`)}
         />
       </Section>
 
       <Section
         title="Recent activity"
         action={
-          <button onClick={() => navigate("/ledger")} className="t-small text-accent hover:underline">
+          <button onClick={() => navigate("/app/ledger")} className="t-small text-accent hover:underline">
             View ledger
           </button>
         }
@@ -128,7 +128,7 @@ export function Overview() {
                 <span className="t-body">
                   {suggested.length} possible transfer{suggested.length > 1 ? "s" : ""} to confirm
                 </span>
-                <button onClick={() => navigate("/ledger")} className="t-small text-accent hover:underline">
+                <button onClick={() => navigate("/app/ledger")} className="t-small text-accent hover:underline">
                   Review
                 </button>
               </li>
@@ -139,7 +139,7 @@ export function Overview() {
                   {uncategorized.length} uncategorized transaction
                   {uncategorized.length > 1 ? "s" : ""}
                 </span>
-                <button onClick={() => navigate("/ledger")} className="t-small text-accent hover:underline">
+                <button onClick={() => navigate("/app/ledger")} className="t-small text-accent hover:underline">
                   Categorize
                 </button>
               </li>

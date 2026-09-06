@@ -54,6 +54,15 @@ data "aws_iam_policy_document" "api_lambda" {
     ]
   }
 
+  # Verifying a login and signing a session token both require this secret.
+  # Scoped to the auth secret only — the API still cannot read Plaid credentials.
+  statement {
+    sid       = "ReadAuthSecret"
+    effect    = "Allow"
+    actions   = ["secretsmanager:GetSecretValue"]
+    resources = [aws_secretsmanager_secret.auth.arn]
+  }
+
   # ── Analytical reads ──────────────────────────────────────────────────────
   # Reports aggregate over the full transaction history, which is exactly what
   # Athena is for (SPEC §8). Read-only: the API can query the curated layer but

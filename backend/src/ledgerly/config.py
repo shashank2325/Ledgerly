@@ -26,6 +26,7 @@ class Config:
     athena_workgroup: str
     glue_database: str
     plaid_secret_arn: str
+    auth_secret_arn: str
 
     @property
     def is_local(self) -> bool:
@@ -50,4 +51,5 @@ def get_config() -> Config:
         athena_workgroup=_env("ATHENA_WORKGROUP"),
         glue_database=_env("GLUE_DATABASE"),
         plaid_secret_arn=_env("PLAID_SECRET_ARN"),
+        auth_secret_arn=_env("AUTH_SECRET_ARN"),
     )

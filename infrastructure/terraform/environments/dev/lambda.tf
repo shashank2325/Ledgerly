@@ -79,6 +79,7 @@ resource "aws_lambda_function" "api" {
       # Only the ARN — the API role cannot read this secret, and the value is
       # never passed through the environment (SPEC §32: no secrets in env vars).
       PLAID_SECRET_ARN        = aws_secretsmanager_secret.plaid.arn
+      AUTH_SECRET_ARN         = aws_secretsmanager_secret.auth.arn
       POWERTOOLS_SERVICE_NAME = "ledgerly-api"
     }
   }

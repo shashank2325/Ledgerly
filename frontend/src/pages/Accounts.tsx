@@ -93,7 +93,7 @@ export function Accounts() {
             <div className="t-small text-ink-faint mb-1">{institution}</div>
             {list.map((a) => (
               <AccountRow key={a.account_id} account={a}
-                onClick={() => navigate(`/ledger?account=${a.account_id}`)} />
+                onClick={() => navigate(`/app/ledger?account=${a.account_id}`)} />
             ))}
           </div>
         ))}
@@ -111,7 +111,7 @@ export function Accounts() {
             <div className="t-small text-ink-faint mb-1">{institution}</div>
             {list.map((a) => (
               <AccountRow key={a.account_id} account={a}
-                onClick={() => navigate(`/ledger?account=${a.account_id}`)} />
+                onClick={() => navigate(`/app/ledger?account=${a.account_id}`)} />
             ))}
           </div>
         ))}

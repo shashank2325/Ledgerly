@@ -10,6 +10,14 @@ import type { Account, CashFlowReport } from "@/types";
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? "";
 
+// Held module-level and attached by `request`, so no call site has to remember
+// the header. Set by AuthProvider whenever the session changes.
+let authToken: string | null = null;
+
+export function setAuthToken(token: string | null): void {
+  authToken = token;
+}
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -26,7 +34,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   try {
     response = await fetch(`${BASE_URL}${path}`, {
       ...init,
-      headers: { "Content-Type": "application/json", ...init?.headers },
+      headers: {
+        "Content-Type": "application/json",
+        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        ...init?.headers,
+      },
     });
   } catch (cause) {
     // Network-level failure: show the real reason, never "Something went
@@ -65,6 +77,14 @@ export interface PlaidItem {
 }
 
 export const api = {
+  login: (username: string, password: string) =>
+    request<{ token: string; expires_at: number; username: string }>("/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ username, password }),
+    }),
+
+  getSession: () => request<{ username: string; valid: boolean }>("/auth/session"),
+
   getAccounts: () => request<AccountsResponse>("/accounts"),
 
   /** Cash-flow report, Sankey-shaped. Aggregation happens in Athena; the
