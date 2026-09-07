@@ -7,17 +7,25 @@ import { Sparkline } from "@/components/charts/Sparkline";
  * Outlined rather than bare. DESIGN.md §3.1 rules out cards — shadowed,
  * elevated boxes floating on a tinted ground — and this is not that: a single
  * 1px hairline in the existing rule color, square corners, no shadow, no fill.
- * It contains the row without introducing an elevation system.
+ * It contains the group without introducing an elevation system.
  *
- * Always ONE row. Wrapping four stats onto two lines breaks the scan — the eye
- * reads a grid instead of a sequence, and the fourth figure stops looking
- * peer-level with the first. Below the width where they fit, the row scrolls
- * inside its own container, which §3.5 already requires of wide content.
+ * ONE ROW on desktop, STACKED on mobile.
+ *
+ * On a wide screen the figures are peers read left to right, and wrapping them
+ * onto two lines breaks that — the eye reads a grid instead of a sequence.
+ * On a phone there is no such thing as one row: four cells either scroll (so
+ * you cannot see them at once, and two are permanently offscreen) or shrink
+ * until the numbers wrap. Stacking shows all four at full size in one glance,
+ * which is what the row was for in the first place. The divider flips axis with
+ * the layout so the hairline always separates rather than crosses.
  */
 export function StatRow({ children }: { children: ReactNode }) {
   return (
-    <div className="overflow-x-auto -mx-1 px-1">
-      <div className="border border-rule divide-x divide-rule flex min-w-max">
+    <div className="md:overflow-x-auto md:-mx-1 md:px-1">
+      <div
+        className="border border-rule flex flex-col divide-y divide-rule
+                   md:flex-row md:divide-y-0 md:divide-x md:min-w-max"
+      >
         {children}
       </div>
     </div>
@@ -64,13 +72,15 @@ export function Stat({
     </>
   );
 
-  // min-w keeps every cell wide enough for a seven-figure amount plus its
-  // label, so the row scrolls rather than crushing a number into two lines.
-  // flex-col + justify-start forces identical top alignment across cells.
-  // Without it, <button> centres its content vertically while <div> does not,
+  // min-w applies only from md, where cells sit side by side and the row
+  // scrolls rather than crushing a number onto two lines. Stacked on mobile,
+  // each cell already has the full width.
+  //
+  // flex-col + justify-start forces identical top alignment across cells:
+  // without it <button> centres its content vertically while <div> does not,
   // so the tallest cell (the one with a hint) pushes every other label down.
   const shell =
-    "relative overflow-hidden flex-1 min-w-[148px] md:min-w-[176px] " +
+    "relative overflow-hidden flex-1 md:min-w-[176px] " +
     "px-4 md:px-5 py-3.5 md:py-4 text-left " +
     "flex flex-col justify-start";
 
