@@ -46,7 +46,7 @@ function AccountRow({ account, onClick }: { account: Account; onClick: () => voi
 
 export function Accounts() {
   const navigate = useNavigate();
-  const { data, loading, error, refetch } = useApi(() => api.getAccounts());
+  const { data, loading, error, refetch } = useApi("accounts", () => api.getAccounts());
 
   if (loading) {
     return (

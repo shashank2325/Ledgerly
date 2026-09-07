@@ -96,6 +96,7 @@ export function Reports() {
   );
 
   const { data, loading, error, refetch } = useApi<CashFlowReport>(
+    "cashflow",
     () => api.getCashFlowReport(range.from, range.to),
     [range.from, range.to],
   );

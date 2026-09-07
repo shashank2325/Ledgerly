@@ -30,6 +30,7 @@ export function Ledger() {
   // Filtering happens in Athena, not in the browser: the client only ever holds
   // one page, so filtering client-side would silently search a subset.
   const { data, loading, error, refetch } = useApi(
+    "transactions",
     () =>
       api.getTransactions({
         type: typeFilter === "ALL" ? undefined : typeFilter,
@@ -41,7 +42,7 @@ export function Ledger() {
     [typeFilter, categoryFilter, accountFilter, search],
   );
 
-  const { data: accountsData } = useApi(() => api.getAccounts(), []);
+  const { data: accountsData } = useApi("accounts", () => api.getAccounts());
   const accountName = useMemo(() => {
     const byId = new Map((accountsData?.accounts ?? []).map((a: Account) => [a.account_id, a]));
     return (id: string) => {

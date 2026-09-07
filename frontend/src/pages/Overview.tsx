@@ -20,9 +20,9 @@ import type { Account } from "@/types";
  */
 export function Overview() {
   const navigate = useNavigate();
-  const { data: d, loading, error, refetch } = useApi(() => api.getDashboard(), []);
-  const { data: recentData } = useApi(() => api.getTransactions({ limit: 12 }), []);
-  const { data: accountsData } = useApi(() => api.getAccounts(), []);
+  const { data: d, loading, error, refetch } = useApi("dashboard", () => api.getDashboard());
+  const { data: recentData } = useApi("transactions:recent12", () => api.getTransactions({ limit: 12 }));
+  const { data: accountsData } = useApi("accounts", () => api.getAccounts());
 
   const accountName = (id: string) => {
     const account = (accountsData?.accounts ?? []).find((a: Account) => a.account_id === id);

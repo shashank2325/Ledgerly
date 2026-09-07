@@ -19,6 +19,18 @@ import { ApiError } from "@/api/client";
  * endpoints, no cache-invalidation problem worth react-query's size — the
  * invalidation rule here is simply "a sync happened", which `clearApiCache`
  * expresses in one line.
+ *
+ * THE KEY IS REQUIRED AND MUST IDENTIFY THE ENDPOINT. An earlier version
+ * derived it from `deps`, which was a serious bug: five call sites pass `[]`
+ * (dashboard, transactions, accounts on three different pages), so they all
+ * shared the key "[]" and overwrote each other. Whichever request resolved
+ * last won, and every page then read whatever payload happened to be there —
+ * Accounts rendered the dashboard payload and showed zero accounts, and
+ * navigating back crashed on a field that did not exist on the wrong shape.
+ *
+ * Deps identify a VARIANT of a request; they cannot identify the request.
+ * Passing the key explicitly is what makes a collision visible at the call
+ * site instead of at runtime.
  */
 
 interface Entry {
@@ -46,13 +58,16 @@ interface State<T> {
 }
 
 export function useApi<T>(
+  /** Identifies the endpoint AND its variant, e.g. "accounts" or
+   *  `transactions:${JSON.stringify(filters)}`. Two call sites sharing a key
+   *  share a cache entry, so the key must be unique per distinct response. */
+  cacheKey: string,
   fetcher: () => Promise<T>,
   deps: unknown[] = [],
-  options: { key?: string } = {},
 ) {
-  // Derived from the deps, so two pages requesting the same filtered view share
-  // an entry while a different filter gets its own.
-  const key = options.key ?? JSON.stringify(deps);
+  // Variants of the same endpoint get their own entry; the endpoint name keeps
+  // unrelated endpoints from ever colliding.
+  const key = deps.length ? `${cacheKey}:${JSON.stringify(deps)}` : cacheKey;
   const cached = cache.get(key);
 
   const [state, setState] = useState<State<T>>(() =>
