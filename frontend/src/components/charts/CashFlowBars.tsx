@@ -14,7 +14,7 @@ export function CashFlowBars({ data }: { data: MonthlyCashFlow[] }) {
 
   return (
     <div
-      className="flex items-stretch gap-2 h-36"
+      className="flex items-stretch gap-1.5 md:gap-2 h-28 md:h-36"
       role="img"
       aria-label="Monthly income versus expenses"
     >

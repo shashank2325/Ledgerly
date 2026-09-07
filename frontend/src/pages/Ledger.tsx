@@ -156,7 +156,9 @@ export function Ledger() {
           </div>
         </div>
 
-        <div className={`${LEDGER_GRID} px-1 pb-2 rule-b`}>
+        {/* Column headers only exist on desktop: on mobile each row is two
+            stacked lines, so a header row would not line up with anything. */}
+        <div className={`hidden md:grid ${LEDGER_GRID} px-1 pb-2 rule-b`}>
           <span className="t-label">Date</span>
           <span className="t-label">Merchant</span>
           <span className="t-label">Category</span>

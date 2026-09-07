@@ -53,12 +53,14 @@ export function TransferPair({
       } pl-2`}
     >
       {/* Collapsed summary — one line, the default view. */}
-      <div className={`${LEDGER_GRID} row row-hover px-1`}>
-        <span className="t-num-sm text-ink-muted">{formatDate(source.transaction_date)}</span>
+      <div className={`${LEDGER_GRID} row-hover px-1 rule-b py-2.5 md:py-0 md:h-10`}>
+        <span className="hidden md:block t-num-sm text-ink-muted">
+          {formatDate(source.transaction_date)}
+        </span>
 
         <button
           onClick={() => setExpanded((e) => !e)}
-          className="flex items-center gap-2 min-w-0 text-left"
+          className="flex items-center gap-2 min-w-0 text-left order-1 md:order-none"
           aria-expanded={expanded}
         >
           <span className="t-body text-transfer">{kindLabel}</span>
@@ -74,7 +76,10 @@ export function TransferPair({
           </span>
         </button>
 
-        <span className="t-small text-ink-muted">
+        {/* "Not counted" / "Suggested" and the day gap are desktop-only: on a
+            phone the amount and the From/To pair already carry the meaning, and
+            two more columns would push the row to three lines. */}
+        <span className="hidden md:block t-small text-ink-muted">
           {suggested ? (
             <span className="text-transfer">Suggested</span>
           ) : (
@@ -83,11 +88,11 @@ export function TransferPair({
           )}
         </span>
 
-        <span className="t-small text-ink-faint">
+        <span className="hidden md:block t-small text-ink-faint">
           {group.date_gap_days > 0 && `${group.date_gap_days}d apart`}
         </span>
 
-        <span className="text-right">
+        <span className="text-right order-2 md:order-none">
           <Money amount={group.amount} type="TRANSFER" />
         </span>
       </div>
@@ -99,15 +104,22 @@ export function TransferPair({
             { txn: source, name: sourceAccountName, role: "From" },
             { txn: destination, name: destAccountName, role: "To" },
           ].map(({ txn, name, role }) => (
-            <div key={txn.transaction_id} className={`${LEDGER_GRID} row px-1 border-b-0`}>
-              <span className="t-num-sm text-ink-faint">{formatDate(txn.transaction_date)}</span>
-              <span className="t-small text-ink-muted truncate pl-3">
+            <div
+              key={txn.transaction_id}
+              className={`${LEDGER_GRID} px-1 py-1.5 md:py-0 md:h-10 md:items-center`}
+            >
+              <span className="hidden md:block t-num-sm text-ink-faint">
+                {formatDate(txn.transaction_date)}
+              </span>
+              <span className="t-small text-ink-muted truncate md:pl-3 order-1 md:order-none">
                 <span className="t-label mr-2">{role}</span>
                 {txn.description}
               </span>
-              <span />
-              <span className="t-small text-ink-faint truncate">{name ?? txn.account_id}</span>
-              <span className="text-right">
+              <span className="hidden md:block" />
+              <span className="hidden md:block t-small text-ink-faint truncate">
+                {name ?? txn.account_id}
+              </span>
+              <span className="text-right order-2 md:order-none">
                 {/* forceSign is essential here: without it both legs read as
                     "$2,000.00" and the cancellation — the whole point of the
                     pair — is invisible. */}
@@ -117,10 +129,10 @@ export function TransferPair({
           ))}
           {/* Spell out the arithmetic. This is the claim the product makes. */}
           <div className={`${LEDGER_GRID} px-1 py-1.5`}>
-            <span />
-            <span className="t-small text-ink-faint pl-3">Net effect on spending</span>
-            <span />
-            <span />
+            <span className="hidden md:block" />
+            <span className="t-small text-ink-faint md:pl-3">Net effect on spending</span>
+            <span className="hidden md:block" />
+            <span className="hidden md:block" />
             <span className="t-num-sm text-ink-faint text-right">$0.00</span>
           </div>
         </div>

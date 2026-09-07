@@ -15,19 +15,30 @@ import type { Account } from "@/types";
  *  balance — a card with $1,500 owed reports a positive number. */
 function AccountRow({ account, onClick }: { account: Account; onClick: () => void }) {
   return (
-    <button onClick={onClick} className="w-full text-left row row-hover px-1 gap-4">
-      <span className="flex-1 min-w-0 flex items-baseline gap-2">
+    <button
+      onClick={onClick}
+      className="w-full text-left row-hover px-1 rule-b py-2.5 md:py-0 md:h-10
+                 grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-0.5
+                 md:flex md:items-center md:gap-4"
+    >
+      <span className="md:flex-1 min-w-0 flex items-baseline gap-2">
         <span className="t-body truncate">{account.name}</span>
         <span className="t-num-sm text-ink-faint shrink-0">··{account.mask}</span>
       </span>
-      <span className="t-small text-ink-muted w-28 shrink-0 truncate capitalize">
-        {account.account_subtype}
-      </span>
-      <span className="t-small text-ink-faint w-24 shrink-0">
-        {account.last_synced_at ? relativeTime(account.last_synced_at) : "never"}
-      </span>
-      <span className="w-28 shrink-0 text-right">
+      {/* Balance stays on the first line on mobile — it is the reason you
+          opened the page. */}
+      <span className="text-right md:w-28 md:shrink-0 md:order-none order-1">
         <Money amount={account.current_balance ?? "0"} />
+      </span>
+      {/* Type and sync age share the second line on mobile. */}
+      <span className="order-2 md:order-none col-span-2 md:col-span-1 flex items-baseline
+                       gap-2 md:contents">
+        <span className="t-small text-ink-muted md:w-28 md:shrink-0 truncate capitalize">
+          {account.account_subtype}
+        </span>
+        <span className="t-small text-ink-faint md:w-24 md:shrink-0 ml-auto md:ml-0">
+          {account.last_synced_at ? relativeTime(account.last_synced_at) : "never"}
+        </span>
       </span>
     </button>
   );
@@ -91,7 +102,7 @@ export function Accounts() {
       <Section title="Assets">
         {byInstitution(assets).map(([institution, list]) => (
           <div key={institution} className="mb-5 last:mb-0">
-            <div className="flex items-baseline justify-between mb-1 gap-4">
+            <div className="flex items-baseline justify-between mb-1 gap-4 flex-wrap">
               <span className="t-small text-ink-faint">{institution}</span>
               {list[0]?.item_id && (
                 <RemoveConnection
@@ -121,7 +132,7 @@ export function Accounts() {
       <Section title="Liabilities">
         {byInstitution(liabilities).map(([institution, list]) => (
           <div key={institution} className="mb-5 last:mb-0">
-            <div className="flex items-baseline justify-between mb-1 gap-4">
+            <div className="flex items-baseline justify-between mb-1 gap-4 flex-wrap">
               <span className="t-small text-ink-faint">{institution}</span>
               {list[0]?.item_id && (
                 <RemoveConnection

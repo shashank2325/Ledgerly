@@ -49,12 +49,12 @@ export function Panel({
   return (
     <section className="border border-rule mt-6 first:mt-0">
       {(title || action) && (
-        <header className="flex items-baseline justify-between gap-4 px-5 py-3 rule-b">
+        <header className="flex items-baseline justify-between gap-4 px-4 md:px-5 py-3 rule-b">
           {title && <h2 className="t-label">{title}</h2>}
           {action}
         </header>
       )}
-      <div className="px-5 py-5">{children}</div>
+      <div className="px-4 md:px-5 py-4 md:py-5">{children}</div>
     </section>
   );
 }

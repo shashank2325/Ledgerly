@@ -24,10 +24,15 @@ export function Settings() {
     <>
       <PageHeader title="Settings" />
 
-      <div className="flex gap-5 rule-b-strong pb-3 mb-1" role="tablist">
+      {/* Scrolls rather than wraps: a wrapped tab row changes height and shifts
+          the content beneath it as you switch tabs. */}
+      <div
+        className="flex gap-5 rule-b-strong pb-3 mb-1 overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0"
+        role="tablist"
+      >
         {TABS.map((t) => (
           <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)}
-            className={`t-small transition-colors ${
+            className={`t-small transition-colors shrink-0 whitespace-nowrap ${
               tab === t ? "text-ink font-medium" : "text-ink-muted hover:text-ink"
             }`}>
             {t}
@@ -39,7 +44,7 @@ export function Settings() {
         {tab === "Connections" && (
           <>
             {items.map((a) => (
-              <div key={a.item_id} className="row justify-between px-1">
+              <div key={a.item_id} className="flex items-center justify-between gap-3 flex-wrap px-1 py-2.5 md:py-0 md:h-10 rule-b">
                 <span className="flex items-baseline gap-3">
                   <span className="t-body">{a.institution_name}</span>
                   <span className="t-small text-ink-faint">
@@ -86,7 +91,7 @@ export function Settings() {
               ["Transactions stored", "16"],
               ["Raw payloads retained", "All — since first sync"],
             ].map(([k, v]) => (
-              <div key={k} className="row justify-between px-1">
+              <div key={k} className="flex items-center justify-between gap-3 px-1 py-2.5 md:py-0 md:h-10 rule-b">
                 <span className="t-body">{k}</span>
                 <span className="t-small text-ink-muted">{v}</span>
               </div>

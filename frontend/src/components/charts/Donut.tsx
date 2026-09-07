@@ -88,8 +88,8 @@ export function Donut({
   const focused = active !== null ? arcs[active] : null;
 
   return (
-    <div className="flex items-center gap-8 flex-wrap">
-      <div className="relative shrink-0" style={{ width: 168, height: 168 }}>
+    <div className="flex flex-col sm:flex-row sm:items-center gap-6 sm:gap-8">
+      <div className="relative shrink-0 self-center sm:self-auto" style={{ width: 168, height: 168 }}>
         <svg
           viewBox="0 0 100 100"
           className="w-full h-full -rotate-90"
@@ -145,7 +145,7 @@ export function Donut({
       {/* Legend. Always present, always carrying the value — identity is never
           conveyed by color alone, and it is the contrast relief the validator
           requires for three of the light-mode slots. */}
-      <ul className="flex-1 min-w-[200px] flex flex-col">
+      <ul className="flex-1 w-full sm:min-w-[200px] flex flex-col">
         {arcs.map((arc) => (
           <li key={arc.segment.category}>
             <button

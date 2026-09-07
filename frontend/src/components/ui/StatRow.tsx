@@ -70,7 +70,8 @@ export function Stat({
   // Without it, <button> centres its content vertically while <div> does not,
   // so the tallest cell (the one with a hint) pushes every other label down.
   const shell =
-    "relative overflow-hidden flex-1 min-w-[176px] px-5 py-4 text-left " +
+    "relative overflow-hidden flex-1 min-w-[148px] md:min-w-[176px] " +
+    "px-4 md:px-5 py-3.5 md:py-4 text-left " +
     "flex flex-col justify-start";
 
   return onClick ? (

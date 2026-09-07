@@ -25,7 +25,7 @@ export function Landing() {
 
   return (
     <div className="min-h-screen bg-canvas text-ink flex flex-col">
-      <header className="flex items-center justify-between px-8 py-6 max-w-[1100px] w-full mx-auto">
+      <header className="flex items-center justify-between px-4 sm:px-8 py-5 sm:py-6 max-w-[1100px] w-full mx-auto">
         <div className="t-h1 select-none">
           Ledgerly<span className="text-accent">.</span>
         </div>
@@ -46,7 +46,7 @@ export function Landing() {
         </div>
       </header>
 
-      <main className="flex-1 max-w-[1100px] w-full mx-auto px-8 pt-16 pb-24">
+      <main className="flex-1 max-w-[1100px] w-full mx-auto px-4 sm:px-8 pt-10 sm:pt-16 pb-16 sm:pb-24">
         <h1 className="text-[clamp(2.5rem,7vw,4.5rem)] font-semibold leading-[1.05] tracking-[-0.03em] max-w-3xl">
           Your financial data,
           <br />
@@ -60,10 +60,10 @@ export function Landing() {
         </p>
 
         {/* ── The differentiator, shown rather than claimed ─────────────── */}
-        <section className="mt-20 rule-t pt-10">
+        <section className="mt-14 sm:mt-20 rule-t pt-8 sm:pt-10">
           <div className="t-label mb-6">Why the numbers are right</div>
 
-          <div className="grid md:grid-cols-[1.1fr_1fr] gap-12 items-start">
+          <div className="grid md:grid-cols-[1.1fr_1fr] gap-8 md:gap-12 items-start">
             <div>
               <h2 className="t-h1 mb-4 max-w-md leading-tight">
                 A transfer is two transactions, not a label on one.
@@ -129,9 +129,9 @@ export function Landing() {
         </section>
 
         {/* ── What it is, plainly ───────────────────────────────────────── */}
-        <section className="mt-20 rule-t pt-10">
+        <section className="mt-14 sm:mt-20 rule-t pt-8 sm:pt-10">
           <div className="t-label mb-8">Built on</div>
-          <div className="grid sm:grid-cols-3 gap-10">
+          <div className="grid sm:grid-cols-3 gap-8 sm:gap-10">
             {[
               {
                 title: "An immutable raw layer",
@@ -154,7 +154,7 @@ export function Landing() {
           </div>
         </section>
 
-        <div className="mt-20 rule-t pt-10 flex items-baseline gap-6">
+        <div className="mt-14 sm:mt-20 rule-t pt-8 sm:pt-10 flex items-baseline gap-6 flex-wrap">
           <button
             onClick={() => setShowLogin(true)}
             className="t-body text-accent hover:underline underline-offset-4"

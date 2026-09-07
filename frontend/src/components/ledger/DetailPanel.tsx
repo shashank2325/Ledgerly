@@ -25,14 +25,26 @@ export function DetailPanel({
   ];
 
   return (
-    <aside className="w-[320px] shrink-0 border-l border-rule pl-6 ml-6 sticky top-0 self-start py-1">
+    <aside
+      className="fixed inset-x-0 bottom-0 z-30 max-h-[80vh] overflow-y-auto
+                 bg-canvas rule-t px-4 py-5
+                 md:static md:inset-auto md:z-auto md:max-h-none md:overflow-visible
+                 md:w-[320px] md:shrink-0 md:border-l md:border-t-0 md:border-rule
+                 md:pl-6 md:ml-6 md:px-0 md:py-1 md:sticky md:top-0 md:self-start"
+    >
       <div className="flex items-start justify-between mb-6">
         <div>
           <div className="t-label mb-2">Transaction</div>
           <Money amount={txn.amount} type={txn.transaction_type} pending={txn.is_pending} size="lg" />
         </div>
-        <button onClick={onClose} aria-label="Close details"
-          className="t-body text-ink-faint hover:text-ink leading-none">×</button>
+        <button
+          onClick={onClose}
+          aria-label="Close details"
+          className="w-11 h-11 -mr-2 -mt-2 md:w-auto md:h-auto md:m-0 flex items-center
+                     justify-center t-body text-ink-faint hover:text-ink leading-none"
+        >
+          ×
+        </button>
       </div>
 
       <dl className="flex flex-col">
