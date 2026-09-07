@@ -3,7 +3,6 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Money } from "@/components/ui/Money";
 import { Stat, StatRow } from "@/components/ui/StatRow";
 import { Panel, Section } from "@/components/ui/primitives";
-import { CategoryBars } from "@/components/charts/CategoryBars";
 import { Donut } from "@/components/charts/Donut";
 import { CashFlowBars } from "@/components/charts/CashFlowBars";
 import { TransactionRow } from "@/components/ledger/TransactionRow";
@@ -121,26 +120,17 @@ export function Overview() {
       </Panel>
       )}
 
+      {/* A ranked-bars panel used to sit beneath this one. Removed: the donut's
+          legend is already sorted by amount and carries both the percentage and
+          the value, so ranking was available in both places. Two widgets
+          answering one question is noise. */}
       {d.spending_by_category.length > 0 && (
-        <>
-          {/* Two views of the same numbers, doing different jobs: the donut
-              answers "roughly how is it split", the ranked bars answer "which
-              is bigger than which". A donut alone cannot do the second — close
-              arc lengths are not comparable — so it does not replace them. */}
-          <Panel title="Where it went">
-            <Donut
-              data={d.spending_by_category}
-              onSelect={(c) => navigate(`/app/ledger?category=${encodeURIComponent(c)}`)}
-            />
-          </Panel>
-
-          <Panel title="Spending by category">
-            <CategoryBars
-              data={d.spending_by_category}
-              onSelect={(c) => navigate(`/app/ledger?category=${encodeURIComponent(c)}`)}
-            />
-          </Panel>
-        </>
+        <Panel title="Where it went">
+          <Donut
+            data={d.spending_by_category}
+            onSelect={(c) => navigate(`/app/ledger?category=${encodeURIComponent(c)}`)}
+          />
+        </Panel>
       )}
 
       <Panel
