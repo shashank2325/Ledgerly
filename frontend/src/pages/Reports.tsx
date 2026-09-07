@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Money } from "@/components/ui/Money";
+import { Stat, StatRow } from "@/components/ui/StatRow";
 import { EmptyState, ErrorState, Section, SkeletonRows } from "@/components/ui/primitives";
 import { Sankey } from "@/components/charts/Sankey";
 import { api } from "@/api/client";
@@ -87,14 +88,6 @@ function RangeControl({
 }
 
 /** One of the four summary numbers. Bare, hairline-separated, no card. */
-function Stat({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="bg-canvas py-4 pr-4">
-      <div className="t-label mb-1.5">{label}</div>
-      {children}
-    </div>
-  );
-}
 
 export function Reports() {
   const options = useMemo(presets, []);
@@ -168,9 +161,8 @@ export function Reports() {
     <>
       {header}
 
-      {/* Four numbers across the top. Separators are the 1px grid gap showing
-          through, not borders on boxes (DESIGN.md §3.1). */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-rule">
+      {/* Four figures on one line, outlined. See components/ui/StatRow. */}
+      <StatRow>
         <Stat label="Total income">
           <Money amount={data.total_income} type="INCOME" exact={false} size="lg" />
         </Stat>
@@ -216,7 +208,7 @@ export function Reports() {
             </span>
           )}
         </Stat>
-      </div>
+      </StatRow>
 
       <Section title="Where the money went">
         {nothingToShow ? (

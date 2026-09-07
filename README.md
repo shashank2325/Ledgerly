@@ -44,7 +44,7 @@ Phase 0 — scaffold. See `docs/DESIGN.md` §6 for the build order.
 ## Local setup
 
 ```bash
-# Backend
+# Backend — installs the package and dev tooling
 cd backend && python3 -m venv .venv && source .venv/bin/activate && pip install -e ".[dev]"
 
 # Frontend
@@ -53,6 +53,39 @@ cd frontend && npm install && npm run dev
 # Infrastructure
 cd infrastructure/terraform/environments/dev && terraform init
 ```
+
+## Running the backend
+
+**There is no backend server.** The backend is three Lambda functions, already
+deployed. `terraform apply` is the deploy step — there is nothing to start.
+
+For a local dev loop, `scripts/local-api.py` serves HTTP on localhost and
+dispatches into the same handler code Lambda runs, building the API Gateway
+event shape by hand:
+
+```bash
+./scripts/local-api.py                  # http://localhost:8000
+echo "VITE_API_URL=http://localhost:8000" > frontend/.env.local
+```
+
+Downstream services are **not** mocked — DynamoDB, Athena, S3 and Secrets
+Manager are the real dev resources, so behaviour matches the deployed function.
+That also means writes are real. Requires working AWS credentials.
+
+Other things you can actually run locally:
+
+```bash
+cd backend
+PYTHONPATH=src ./.venv/bin/python -m pytest tests/ -q    # 34 tests, no AWS needed
+./.venv/bin/ruff check src/                              # lint
+./.venv/bin/mypy src/                                    # types
+
+../scripts/sync.sh                                       # trigger a real sync
+../scripts/sync.sh --logs                                # ...and tail the logs
+```
+
+Deploying a code change is just `terraform apply` — the archive hash changes and
+the functions update.
 
 ## Security
 

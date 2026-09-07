@@ -18,10 +18,10 @@ export function AppShell() {
   const { username, logout } = useAuth();
 
   return (
-    <div className="min-h-screen flex bg-canvas text-ink">
+    <div className="h-screen flex bg-canvas text-ink overflow-hidden">
       {/* Fixed 200px sidebar, hairline right border. Text labels always
           readable — no icons-only collapse (DESIGN.md §3.5). */}
-      <nav className="w-[200px] shrink-0 rule-r min-h-screen sticky top-0 flex flex-col px-5 py-6">
+      <nav className="w-[200px] shrink-0 rule-r h-screen flex flex-col px-5 py-6">
         <div className="t-h1 mb-8 select-none">
           Ledgerly
           {/* The one flourish: a violet period. Transfers are the thesis and
@@ -77,7 +77,7 @@ export function AppShell() {
 
       {/* Content left-aligned within the pane, not centered — centered content
           in a wide viewport reads as marketing. */}
-      <main className="flex-1 min-w-0">
+      <main className="flex-1 min-w-0 h-screen overflow-y-auto">
         <div className="max-w-[1100px] px-10 py-8">
           <Outlet />
         </div>

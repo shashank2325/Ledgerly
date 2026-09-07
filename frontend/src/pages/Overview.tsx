@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Money } from "@/components/ui/Money";
+import { Stat, StatRow } from "@/components/ui/StatRow";
 import { Section } from "@/components/ui/primitives";
 import { CategoryBars } from "@/components/charts/CategoryBars";
 import { CashFlowBars } from "@/components/charts/CashFlowBars";
@@ -74,24 +75,22 @@ export function Overview() {
         </div>
       </section>
 
-      {/* ── This month: three bare numbers, hairline separated. No cards. ──── */}
+      {/* ── This month: three figures on one line, outlined. ──────────────── */}
       <Section>
-        <div className="grid grid-cols-3 gap-px bg-rule">
+        <StatRow>
           {[
-            { label: "Income", amount: d.month_income, type: "INCOME" as const, to: "/ledger?type=INCOME" },
-            { label: "Spending", amount: d.month_spending, type: undefined, to: "/ledger?type=EXPENSE" },
-            { label: "Net", amount: d.month_net, type: "INCOME" as const, to: "/ledger" },
-          ].map((s) => (
-            <button
-              key={s.label}
-              onClick={() => navigate(s.to)}
-              className="bg-canvas text-left py-4 pr-4 row-hover"
-            >
-              <div className="t-label mb-1.5">{s.label}</div>
-              <Money amount={s.amount} type={s.type} exact={false} size="lg" />
-            </button>
+            { label: "Income", amount: d.month_income, type: "INCOME" as const, to: "/app/ledger?type=INCOME" },
+            { label: "Spending", amount: d.month_spending, type: undefined, to: "/app/ledger?type=EXPENSE" },
+            // Net carries no type: it can be negative, and <Money> only emits a
+            // leading + for positives — typing it INCOME would print a negative
+            // net as a bare, positive-looking figure.
+            { label: "Net", amount: d.month_net, type: undefined, to: "/app/ledger" },
+          ].map((stat) => (
+            <Stat key={stat.label} label={stat.label} onClick={() => navigate(stat.to)}>
+              <Money amount={stat.amount} type={stat.type} exact={false} size="lg" />
+            </Stat>
           ))}
-        </div>
+        </StatRow>
         {parseAmount(d.month_transfers) > 0 && (
           <p className="mt-3 t-small text-ink-faint">
             {/* State the exclusion explicitly — it is the product's core claim. */}
