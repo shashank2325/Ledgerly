@@ -204,7 +204,13 @@ def list_transactions_route(event: dict[str, Any]) -> tuple[int, dict[str, Any]]
     except ValueError:
         return 400, {"error": "invalid_limit"}
 
-    return 200, list_transactions(
+    from ledgerly.analytics.cache import cached
+
+    key = "txns:" + json.dumps(
+        {k: params.get(k) for k in ("from", "to", "account", "category", "type", "search", "limit")},
+        sort_keys=True,
+    )
+    return 200, cached(key, lambda: list_transactions(
         _athena(),
         get_config().glue_database,
         date_from=params.get("from"),
@@ -214,7 +220,7 @@ def list_transactions_route(event: dict[str, Any]) -> tuple[int, dict[str, Any]]
         transaction_type=params.get("type"),
         search=params.get("search"),
         limit=limit,
-    )
+    ))
 
 
 def dashboard_route(_event: dict[str, Any]) -> tuple[int, dict[str, Any]]:
@@ -234,64 +240,76 @@ def dashboard_route(_event: dict[str, Any]) -> tuple[int, dict[str, Any]]:
     accounts = AccountRepository(cfg.accounts_table).list_all()
     net_worth = sum(a.net_worth_contribution for a in accounts)
 
+    from ledgerly.analytics.cache import cached
+
     athena = _athena()
     month_start = today.replace(day=1)
 
-    # Three independent pieces of work, so issue them together. Athena costs
-    # ~1.7s of fixed planning per query regardless of scan size, so sequencing
-    # them is what makes the page feel broken — a naive version of this took
-    # 11s. The latest-expense probe runs speculatively alongside the current
-    # month: it is needed only if this month turns out to be empty, and paying
-    # for it upfront is cheaper than a second round trip when it is.
-    from concurrent.futures import ThreadPoolExecutor
+    def compute() -> dict[str, Any]:
+        # Three independent pieces of work, so issue them together. Athena
+        # costs ~1s of fixed overhead per query against an Iceberg table
+        # regardless of scan size, so sequencing them is what makes the page
+        # feel broken — a naive version of this took 11s. The latest-expense
+        # probe runs speculatively alongside the current month: it is needed
+        # only if this month turns out to be empty, and paying for it upfront
+        # is cheaper than a second round trip when it is.
+        from concurrent.futures import ThreadPoolExecutor
 
-    with ThreadPoolExecutor(max_workers=3) as pool:
-        current_f = pool.submit(
-            dashboard, athena, cfg.glue_database,
-            month_start=month_start.isoformat(), today=today.isoformat(),
-        )
-        series_f = pool.submit(
-            net_worth_series, athena, cfg.glue_database,
-            current_net_worth=net_worth, today=today.isoformat(),
-        )
-        latest_f = pool.submit(
-            athena.query,
-            f"""SELECT max(transaction_date) AS latest
-                FROM {cfg.glue_database}.transactions
-                WHERE status != 'REMOVED' AND transaction_type = 'EXPENSE'""",
-        )
-        body = current_f.result()
-        series = series_f.result()
-        latest_rows = latest_f.result()
+        with ThreadPoolExecutor(max_workers=3) as pool:
+            current_f = pool.submit(
+                dashboard, athena, cfg.glue_database,
+                month_start=month_start.isoformat(), today=today.isoformat(),
+            )
+            series_f = pool.submit(
+                net_worth_series, athena, cfg.glue_database,
+                current_net_worth=net_worth, today=today.isoformat(),
+            )
+            latest_f = pool.submit(
+                athena.query,
+                f"""SELECT max(transaction_date) AS latest
+                    FROM {cfg.glue_database}.transactions
+                    WHERE status != 'REMOVED' AND transaction_type = 'EXPENSE'""",
+            )
+            result = current_f.result()
+            series = series_f.result()
+            latest_rows = latest_f.result()
 
-    body["month"] = today.strftime("%B %Y")
-    body["is_fallback_month"] = False
+        result["month"] = today.strftime("%B %Y")
+        result["is_fallback_month"] = False
 
-    # A dashboard whose panels are all empty because the month is young, or
-    # because no sync has run, tells the reader nothing and reads as broken.
-    # When the current month has no spending, fall back to the most recent
-    # month that does — and SAY SO. Silently swapping the window would be worse
-    # than showing nothing; labelling it is what makes it honest.
-    if not body["spending_by_category"] and Decimal(body["month_spending"]) == 0:
-        latest = latest_rows[0]["latest"] if latest_rows else None
-        if latest:
-            start_of = date.fromisoformat(latest).replace(day=1)
-            if start_of != month_start:
-                following = (
-                    start_of.replace(year=start_of.year + 1, month=1)
-                    if start_of.month == 12
-                    else start_of.replace(month=start_of.month + 1)
-                )
-                body = dashboard(
-                    athena, cfg.glue_database,
-                    month_start=start_of.isoformat(),
-                    today=(following - timedelta(days=1)).isoformat(),
-                )
-                body["month"] = start_of.strftime("%B %Y")
-                body["is_fallback_month"] = True
+        # A dashboard whose panels are all empty because the month is young, or
+        # because no sync has run, tells the reader nothing and reads as broken.
+        # When the current month has no spending, fall back to the most recent
+        # month that does — and SAY SO. Silently swapping the window would be
+        # worse than showing nothing; labelling it is what makes it honest.
+        if not result["spending_by_category"] and Decimal(result["month_spending"]) == 0:
+            latest = latest_rows[0]["latest"] if latest_rows else None
+            if latest:
+                start_of = date.fromisoformat(latest).replace(day=1)
+                if start_of != month_start:
+                    following = (
+                        start_of.replace(year=start_of.year + 1, month=1)
+                        if start_of.month == 12
+                        else start_of.replace(month=start_of.month + 1)
+                    )
+                    result = dashboard(
+                        athena, cfg.glue_database,
+                        month_start=start_of.isoformat(),
+                        today=(following - timedelta(days=1)).isoformat(),
+                    )
+                    result["month"] = start_of.strftime("%B %Y")
+                    result["is_fallback_month"] = True
+
+        result["net_worth_series"] = series
+        return result
+
+    # Keyed by the day so a date rollover cannot serve yesterday's month.
+    # Net worth and account count come from DynamoDB and are cheap, so they are
+    # attached AFTER the cache: a balance refresh shows up immediately without
+    # waiting for the analytics cache to expire.
+    body = cached(f"dashboard:{today.isoformat()}", compute)
 
     body["net_worth"] = str(net_worth)
-    body["net_worth_series"] = series
     body["account_count"] = len(accounts)
     return 200, body
 
@@ -318,24 +336,31 @@ def cash_flow_report(event: dict[str, Any]) -> tuple[int, dict[str, Any]]:
         except ValueError:
             return 400, {"error": "invalid_date", "detail": f"{value!r} is not YYYY-MM-DD"}
 
-    cfg = get_config()
-    report = cash_flow(
-        AthenaClient(workgroup=cfg.athena_workgroup, database=cfg.glue_database),
-        date_from=date_from,
-        date_to=date_to,
-    )
+    from ledgerly.analytics.cache import cached
 
-    return 200, {
-        "date_from": report.date_from,
-        "date_to": report.date_to,
-        # Money as strings — exact across the wire, never a JS float.
-        "total_income": str(report.total_income),
-        "total_expenses": str(report.total_expenses),
-        "net_income": str(report.net_income),
-        # null when the ratio is not meaningful — the UI renders "—"
-        "savings_rate": str(report.savings_rate) if report.savings_rate is not None else None,
-        "sankey": report.to_sankey(),
-    }
+    cfg = get_config()
+
+    def compute() -> dict[str, Any]:
+        report = cash_flow(
+            AthenaClient(workgroup=cfg.athena_workgroup, database=cfg.glue_database),
+            date_from=date_from,
+            date_to=date_to,
+        )
+        return {
+            "date_from": report.date_from,
+            "date_to": report.date_to,
+            # Money as strings — exact across the wire, never a JS float.
+            "total_income": str(report.total_income),
+            "total_expenses": str(report.total_expenses),
+            "net_income": str(report.net_income),
+            # null when the ratio is not meaningful — the UI renders "—"
+            "savings_rate": str(report.savings_rate)
+            if report.savings_rate is not None
+            else None,
+            "sankey": report.to_sankey(),
+        }
+
+    return 200, cached(f"cashflow:{date_from}:{date_to}", compute)
 
 
 ROUTES: dict[tuple[str, str], Handler] = {

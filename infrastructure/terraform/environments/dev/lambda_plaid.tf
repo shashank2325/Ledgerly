@@ -14,6 +14,16 @@ resource "aws_iam_role" "plaid_lambda" {
 }
 
 data "aws_iam_policy_document" "plaid_lambda" {
+  # The serving cache: read-through on the API, invalidated by writers.
+  statement {
+    sid    = "ServingCache"
+    effect = "Allow"
+    actions = [
+      "dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:DeleteItem", "dynamodb:Scan",
+    ]
+    resources = [aws_dynamodb_table.cache.arn]
+  }
+
   statement {
     sid       = "Logs"
     effect    = "Allow"
@@ -166,6 +176,7 @@ resource "aws_lambda_function" "plaid" {
       LEDGERLY_ENV     = var.environment
       ITEMS_TABLE      = aws_dynamodb_table.items.name
       ACCOUNTS_TABLE   = aws_dynamodb_table.accounts.name
+      CACHE_TABLE   = aws_dynamodb_table.cache.name
       SYNC_RUNS_TABLE  = aws_dynamodb_table.sync_runs.name
       DATA_BUCKET      = aws_s3_bucket.data.id
       PLAID_SECRET_ARN = aws_secretsmanager_secret.plaid.arn

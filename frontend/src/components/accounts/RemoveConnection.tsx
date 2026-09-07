@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { api, ApiError } from "@/api/client";
 import type { RemoveResult } from "@/api/client";
+import { clearApiCache } from "@/hooks/useApi";
 
 /**
  * Disconnect an institution and delete its data.
@@ -31,6 +32,8 @@ export function RemoveConnection({
     setError(null);
     try {
       const removed = await api.removeConnection(itemId);
+      // Transactions and accounts were deleted; nothing cached is still true.
+      clearApiCache();
       setResult(removed);
       onRemoved();
     } catch (err) {

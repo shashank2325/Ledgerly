@@ -105,5 +105,10 @@ def remove_item(
     # 5. Operational record last — while it exists, the removal is resumable.
     dynamo.Table(items_repo._table.name).delete_item(Key={"item_id": item_id})
 
+    # Deleting an institution's transactions changes every aggregate.
+    from ledgerly.analytics.cache import invalidate
+
+    invalidate()
+
     logger.info("item_removed %s", result)
     return result

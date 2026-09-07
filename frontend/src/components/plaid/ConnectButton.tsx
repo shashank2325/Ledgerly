@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { usePlaidLink } from "react-plaid-link";
 import { api, ApiError } from "@/api/client";
+import { clearApiCache } from "@/hooks/useApi";
 
 /**
  * Plaid Link entry point.
@@ -29,6 +30,8 @@ export function ConnectButton({ onConnected }: { onConnected?: () => void }) {
       setStatus(null);
       try {
         const result = await api.exchangePublicToken(publicToken, force);
+        // Accounts, balances and the dashboard all just changed.
+        clearApiCache();
         setDuplicate(null);
         setStatus(
           `Connected ${result.institution_name ?? "institution"} — ${result.accounts_added} accounts`,

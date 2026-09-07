@@ -71,6 +71,7 @@ resource "aws_lambda_function" "api" {
     variables = {
       LEDGERLY_ENV            = var.environment
       ACCOUNTS_TABLE          = aws_dynamodb_table.accounts.name
+      CACHE_TABLE          = aws_dynamodb_table.cache.name
       RULES_TABLE             = aws_dynamodb_table.rules.name
       SYNC_RUNS_TABLE         = aws_dynamodb_table.sync_runs.name
       DATA_BUCKET             = aws_s3_bucket.data.id

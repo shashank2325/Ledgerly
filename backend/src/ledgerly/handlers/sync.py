@@ -114,6 +114,12 @@ def sync_all() -> dict[str, Any]:
 
     detection = detect_transfers()
 
+    # New transactions and reclassified transfers make every cached analytic
+    # wrong. The TTL is only a backstop; this is the real invalidation.
+    from ledgerly.analytics.cache import invalidate
+
+    invalidate()
+
     return {
         "items_synced": len(results),
         "transfer_detection": detection,
@@ -130,7 +136,12 @@ def detect_transfers() -> dict[str, Any]:
 
     cfg = get_config()
     accounts = AccountRepository(cfg.accounts_table).list_all()
-    return detect_and_persist(_athena(), cfg.glue_database, accounts)
+    result = detect_and_persist(_athena(), cfg.glue_database, accounts)
+
+    from ledgerly.analytics.cache import invalidate
+
+    invalidate()
+    return result
 
 
 def reprocess() -> dict[str, Any]:
@@ -145,7 +156,12 @@ def reprocess() -> dict[str, Any]:
     rebuilt = reprocess_transactions(
         bucket=cfg.data_bucket, client=_athena(), database=cfg.glue_database
     )
-    return {"reprocess": rebuilt, "transfer_detection": detect_transfers()}
+    result = {"reprocess": rebuilt, "transfer_detection": detect_transfers()}
+
+    from ledgerly.analytics.cache import invalidate
+
+    invalidate()
+    return result
 
 
 def bootstrap_schemas() -> dict[str, Any]:

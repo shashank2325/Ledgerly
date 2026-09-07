@@ -107,3 +107,34 @@ resource "aws_dynamodb_table" "sync_runs" {
 
   server_side_encryption { enabled = true }
 }
+
+# ── Serving cache ───────────────────────────────────────────────────────────
+# SPEC §8: "Do NOT use Athena as a replacement for DynamoDB for every
+# interactive request." The dashboard and report endpoints were doing exactly
+# that, and paying ~1s of fixed Athena cost per query for it — a page that
+# should feel instant took 3-5s.
+#
+# This is the serving layer the spec asked for: a read-through cache holding the
+# computed payloads. Athena stays the engine that PRODUCES analytics; DynamoDB
+# is what SERVES them. Entries expire by TTL and are cleared on sync, so the
+# cache can never outlive the data it summarises.
+resource "aws_dynamodb_table" "cache" {
+  name         = "${local.prefix}-cache"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "cache_key"
+
+  attribute {
+    name = "cache_key"
+    type = "S"
+  }
+
+  # DynamoDB deletes expired entries itself, at no cost. Nothing here is
+  # irreplaceable — every value is recomputable from Iceberg — so no PITR and
+  # no prevent_destroy.
+  ttl {
+    attribute_name = "expires_at"
+    enabled        = true
+  }
+
+  server_side_encryption { enabled = true }
+}

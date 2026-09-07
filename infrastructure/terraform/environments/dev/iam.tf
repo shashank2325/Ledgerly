@@ -24,6 +24,16 @@ resource "aws_iam_role" "api_lambda" {
 data "aws_iam_policy_document" "api_lambda" {
   # ── Logging ───────────────────────────────────────────────────────────────
   # Scoped to this function's own log group, not "*".
+  # The serving cache: read-through on the API, invalidated by writers.
+  statement {
+    sid    = "ServingCache"
+    effect = "Allow"
+    actions = [
+      "dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:DeleteItem", "dynamodb:Scan",
+    ]
+    resources = [aws_dynamodb_table.cache.arn]
+  }
+
   statement {
     sid    = "Logs"
     effect = "Allow"
