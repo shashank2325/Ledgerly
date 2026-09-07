@@ -2,8 +2,9 @@ import { useNavigate } from "react-router-dom";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Money } from "@/components/ui/Money";
 import { Stat, StatRow } from "@/components/ui/StatRow";
-import { Section } from "@/components/ui/primitives";
+import { Panel, Section } from "@/components/ui/primitives";
 import { CategoryBars } from "@/components/charts/CategoryBars";
+import { Donut } from "@/components/charts/Donut";
 import { CashFlowBars } from "@/components/charts/CashFlowBars";
 import { TransactionRow } from "@/components/ledger/TransactionRow";
 import { TransferPair } from "@/components/ledger/TransferPair";
@@ -55,7 +56,21 @@ export function Overview() {
 
   return (
     <>
-      <PageHeader title="Overview" meta={d.month} />
+      <PageHeader
+        title="Overview"
+        meta={
+          d.is_fallback_month ? (
+            // Never let a swapped time window pass unannounced — a reader who
+            // thinks they are looking at this month would draw wrong
+            // conclusions from the right numbers (DESIGN.md §3.8).
+            <span>
+              {d.month} <span className="text-pending">· no activity yet this month</span>
+            </span>
+          ) : (
+            d.month
+          )
+        }
+      />
 
       {/* ── This month: three figures on one line, outlined. ──────────────── */}
       <Section>
@@ -93,7 +108,7 @@ export function Overview() {
       </Section>
 
       {d.cash_flow.length > 0 && (
-      <Section title="Cash flow">
+      <Panel title="Cash flow">
         <CashFlowBars data={d.cash_flow} />
         <div className="mt-3 flex gap-4 t-small text-ink-faint">
           <span className="flex items-center gap-1.5">
@@ -103,19 +118,32 @@ export function Overview() {
             <span className="w-2 h-2 bg-ink/75 inline-block" aria-hidden="true" /> Expenses
           </span>
         </div>
-      </Section>
+      </Panel>
       )}
 
       {d.spending_by_category.length > 0 && (
-      <Section title="Spending by category">
-        <CategoryBars
-          data={d.spending_by_category}
-          onSelect={(c) => navigate(`/app/ledger?category=${encodeURIComponent(c)}`)}
-        />
-      </Section>
+        <>
+          {/* Two views of the same numbers, doing different jobs: the donut
+              answers "roughly how is it split", the ranked bars answer "which
+              is bigger than which". A donut alone cannot do the second — close
+              arc lengths are not comparable — so it does not replace them. */}
+          <Panel title="Where it went">
+            <Donut
+              data={d.spending_by_category}
+              onSelect={(c) => navigate(`/app/ledger?category=${encodeURIComponent(c)}`)}
+            />
+          </Panel>
+
+          <Panel title="Spending by category">
+            <CategoryBars
+              data={d.spending_by_category}
+              onSelect={(c) => navigate(`/app/ledger?category=${encodeURIComponent(c)}`)}
+            />
+          </Panel>
+        </>
       )}
 
-      <Section
+      <Panel
         title="Recent activity"
         action={
           <button onClick={() => navigate("/app/ledger")} className="t-small text-accent hover:underline">
@@ -141,11 +169,11 @@ export function Overview() {
             />
           ),
         )}
-      </Section>
+      </Panel>
 
       {/* ── Only renders when non-empty ───────────────────────────────────── */}
       {(suggested.length > 0 || uncategorized.length > 0) && (
-        <Section title="Needs attention">
+        <Panel title="Needs attention">
           <ul className="flex flex-col">
             {suggested.length > 0 && (
               <li className="row justify-between">
@@ -169,7 +197,7 @@ export function Overview() {
               </li>
             )}
           </ul>
-        </Section>
+        </Panel>
       )}
 
       <footer className="pt-6 rule-t">

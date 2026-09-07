@@ -91,6 +91,9 @@ export interface DashboardResponse {
   net_worth_series: { date: string; value: string }[];
   account_count: number;
   month: string;
+  /** True when the current month had no activity and the window fell back
+   *  to the most recent month that did. The UI must say so. */
+  is_fallback_month: boolean;
   month_income: string;
   month_spending: string;
   month_net: string;

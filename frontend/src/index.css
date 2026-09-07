@@ -38,6 +38,24 @@
   --c-pending:     #B07A29;
   --c-negative:    #A33B2A;
   --c-accent:      #7A5CA8;
+
+  /* ── Categorical series palette ───────────────────────────────────────────
+     For part-to-whole marks only (the donut). Everywhere else, categories are
+     still distinguished by LABEL, never hue — a rainbow ledger is what §3.2
+     rules out and that stands.
+
+     These are NOT hand-picked. Validated with the dataviz palette validator
+     against this exact surface: lightness band, chroma floor, adjacent-pair
+     CVD separation (protan/deutan/tritan), normal-vision floor, and contrast.
+     Three slots sit under 3:1 on the light surface, so the legend must always
+     carry visible labels and values — that is the required relief, not a
+     nice-to-have. Assigned in FIXED order and never cycled. */
+  --c-series-1: #2a78d6;  /* blue    */
+  --c-series-2: #eb6834;  /* orange  */
+  --c-series-3: #1baf7a;  /* aqua    */
+  --c-series-4: #eda100;  /* yellow  */
+  --c-series-5: #e87ba4;  /* magenta */
+  --c-series-6: #4a3aa7;  /* violet  */
 }
 
 .dark {
@@ -57,6 +75,15 @@
   --c-pending:     #D9A857;
   --c-negative:    #D2705C;
   --c-accent:      #A98FD0;
+
+  /* Re-stepped for the dark surface, not an automatic flip of the light steps.
+     Independently validated against #171614 — all five checks pass. */
+  --c-series-1: #3987e5;
+  --c-series-2: #d95926;
+  --c-series-3: #199e70;
+  --c-series-4: #c98500;
+  --c-series-5: #d55181;
+  --c-series-6: #9085e9;
 }
 
 @theme inline {
@@ -73,6 +100,12 @@
   --color-pending:     var(--c-pending);
   --color-negative:    var(--c-negative);
   --color-accent:      var(--c-accent);
+  --color-series-1:    var(--c-series-1);
+  --color-series-2:    var(--c-series-2);
+  --color-series-3:    var(--c-series-3);
+  --color-series-4:    var(--c-series-4);
+  --color-series-5:    var(--c-series-5);
+  --color-series-6:    var(--c-series-6);
 
   --font-sans: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", monospace;

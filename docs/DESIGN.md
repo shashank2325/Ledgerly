@@ -176,7 +176,15 @@ Skip the dataviz library maximalism. Four chart types, that's the whole vocabula
 3. **Stepped area** — net worth / balance over time. Single series, one fill at 8% opacity.
 4. **Bar pair** — income vs. expenses per month. Two bars, income green, expense ink.
 
-**No pie charts. No donuts. No radial anything.** They're the visual signature of every budgeting app and they're bad at the one job — comparing magnitudes.
+**Amendment (post-launch):** a donut now exists on Overview, at the owner's request. The original blanket ban was overreach on my part — the accurate rule is narrower, and it is the one the chart follows:
+
+> A donut is legitimate for **part-to-whole at a glance, capped at six segments**. It is *not* a substitute for a ranked comparison, because arc lengths of similar size are genuinely not comparable.
+
+So Overview carries both: the donut answers *"roughly how is it split"*, the ranked bars directly beneath answer *"which is bigger than which"*. Neither replaces the other. Beyond five categories the tail folds into "Other" rather than generating a sixth and seventh hue.
+
+This is also the **only** place hue carries category identity. Elsewhere categories are still distinguished by label — a rainbow ledger remains ruled out. The donut's palette is not hand-picked: it is validated against both surfaces for lightness band, chroma floor, adjacent-pair CVD separation (protan/deutan/tritan), normal-vision floor, and contrast. Three light-mode slots fall under 3:1, so the legend must always carry visible labels *and* values — that is required relief, not decoration.
+
+**Still ruled out: pie charts, and any radial form for comparing magnitudes.**
 
 Every chart element is hoverable and every hover reveals the underlying number. Every chart segment is clickable and navigates to the filtered transaction list. This is the "traceable to source" principle expressed in the UI.
 

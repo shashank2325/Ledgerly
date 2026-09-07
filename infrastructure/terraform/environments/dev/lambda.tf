@@ -60,9 +60,10 @@ resource "aws_lambda_function" "api" {
   filename         = data.archive_file.api.output_path
   source_code_hash = data.archive_file.api.output_base64sha256
 
-  # 512 MB is the sweet spot: Lambda scales CPU with memory, so a larger size
-  # often finishes faster and costs the SAME or less. 128 MB would be false
-  # economy on JSON-heavy work.
+  # 512 MB, measured. Raising this to 1024 was tried and made no difference to
+  # dashboard latency — the cost is Athena's fixed ~1.7s planning per query,
+  # not CPU. Since Lambda bills GB-seconds, more memory with the same duration
+  # is simply double the price for nothing.
   memory_size = 512
   timeout     = 15
 

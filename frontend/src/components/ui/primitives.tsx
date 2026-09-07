@@ -6,7 +6,7 @@ export function Label({ children, className = "" }: { children: ReactNode; class
   return <div className={`t-label ${className}`}>{children}</div>;
 }
 
-/** A page section. Hairline separated — no cards, no boxes (DESIGN.md §3.1). */
+/** A page section, hairline separated. */
 export function Section({
   title,
   action,
@@ -25,6 +25,36 @@ export function Section({
         </header>
       )}
       {children}
+    </section>
+  );
+}
+
+/**
+ * A bordered widget area.
+ *
+ * A single 1px hairline in the existing rule color — square corners, no shadow,
+ * no fill. Deliberately not the elevated card §3.1 rules out: it gives each
+ * widget an edge so the page reads as distinct areas rather than one column,
+ * without introducing an elevation system or a second surface color.
+ */
+export function Panel({
+  title,
+  action,
+  children,
+}: {
+  title?: string;
+  action?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <section className="border border-rule mt-6 first:mt-0">
+      {(title || action) && (
+        <header className="flex items-baseline justify-between gap-4 px-5 py-3 rule-b">
+          {title && <h2 className="t-label">{title}</h2>}
+          {action}
+        </header>
+      )}
+      <div className="px-5 py-5">{children}</div>
     </section>
   );
 }

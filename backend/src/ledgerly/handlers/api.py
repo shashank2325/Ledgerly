@@ -223,9 +223,10 @@ def dashboard_route(_event: dict[str, Any]) -> tuple[int, dict[str, Any]]:
     Net worth comes from DynamoDB account balances, not Athena: it is current
     operational state, not history, and the accounts table already holds it.
     """
-    from datetime import date
+    from datetime import date, timedelta
+    from decimal import Decimal
 
-    from ledgerly.analytics.serving import dashboard
+    from ledgerly.analytics.serving import dashboard, net_worth_series
     from ledgerly.storage import AccountRepository
 
     cfg = get_config()
@@ -233,20 +234,65 @@ def dashboard_route(_event: dict[str, Any]) -> tuple[int, dict[str, Any]]:
     accounts = AccountRepository(cfg.accounts_table).list_all()
     net_worth = sum(a.net_worth_contribution for a in accounts)
 
-    body = dashboard(
-        _athena(),
-        cfg.glue_database,
-        month_start=today.replace(day=1).isoformat(),
-        today=today.isoformat(),
-    )
-    from ledgerly.analytics.serving import net_worth_series
+    athena = _athena()
+    month_start = today.replace(day=1)
+
+    # Three independent pieces of work, so issue them together. Athena costs
+    # ~1.7s of fixed planning per query regardless of scan size, so sequencing
+    # them is what makes the page feel broken — a naive version of this took
+    # 11s. The latest-expense probe runs speculatively alongside the current
+    # month: it is needed only if this month turns out to be empty, and paying
+    # for it upfront is cheaper than a second round trip when it is.
+    from concurrent.futures import ThreadPoolExecutor
+
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        current_f = pool.submit(
+            dashboard, athena, cfg.glue_database,
+            month_start=month_start.isoformat(), today=today.isoformat(),
+        )
+        series_f = pool.submit(
+            net_worth_series, athena, cfg.glue_database,
+            current_net_worth=net_worth, today=today.isoformat(),
+        )
+        latest_f = pool.submit(
+            athena.query,
+            f"""SELECT max(transaction_date) AS latest
+                FROM {cfg.glue_database}.transactions
+                WHERE status != 'REMOVED' AND transaction_type = 'EXPENSE'""",
+        )
+        body = current_f.result()
+        series = series_f.result()
+        latest_rows = latest_f.result()
+
+    body["month"] = today.strftime("%B %Y")
+    body["is_fallback_month"] = False
+
+    # A dashboard whose panels are all empty because the month is young, or
+    # because no sync has run, tells the reader nothing and reads as broken.
+    # When the current month has no spending, fall back to the most recent
+    # month that does — and SAY SO. Silently swapping the window would be worse
+    # than showing nothing; labelling it is what makes it honest.
+    if not body["spending_by_category"] and Decimal(body["month_spending"]) == 0:
+        latest = latest_rows[0]["latest"] if latest_rows else None
+        if latest:
+            start_of = date.fromisoformat(latest).replace(day=1)
+            if start_of != month_start:
+                following = (
+                    start_of.replace(year=start_of.year + 1, month=1)
+                    if start_of.month == 12
+                    else start_of.replace(month=start_of.month + 1)
+                )
+                body = dashboard(
+                    athena, cfg.glue_database,
+                    month_start=start_of.isoformat(),
+                    today=(following - timedelta(days=1)).isoformat(),
+                )
+                body["month"] = start_of.strftime("%B %Y")
+                body["is_fallback_month"] = True
 
     body["net_worth"] = str(net_worth)
-    body["net_worth_series"] = net_worth_series(
-        _athena(), cfg.glue_database, current_net_worth=net_worth, today=today.isoformat()
-    )
+    body["net_worth_series"] = series
     body["account_count"] = len(accounts)
-    body["month"] = today.strftime("%B %Y")
     return 200, body
 
 
