@@ -46,13 +46,16 @@ export function Stat({
           behind would be a lie about its precision. */}
       {trend && trend.length > 1 && (
         <div
-          className="absolute inset-0 flex items-end text-ink opacity-[0.16]
-                     dark:opacity-[0.22] pointer-events-none"
+          className="absolute inset-x-0 bottom-0 h-[58px] text-ink-muted
+                     opacity-40 dark:opacity-50 pointer-events-none"
           aria-hidden="true"
         >
-          <Sparkline data={trend} height={64} />
+          <Sparkline data={trend} height={58} />
         </div>
       )}
+      {/* relative + a canvas-tinted backdrop keeps the line strictly behind the
+          number. A trend running through the digits costs legibility of the
+          figure, which is the thing that actually matters. */}
       <div className="relative">
         <div className="t-label mb-1.5">{label}</div>
         {children}

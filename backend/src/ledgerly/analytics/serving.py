@@ -146,55 +146,63 @@ def net_worth_series(
     *,
     current_net_worth: Decimal,
     today: str,
-    months: int = 12,
+    days: int = 90,
 ) -> list[dict[str, str]]:
-    """Reconstruct net worth over time by walking transaction flow backwards.
+    """Daily net-worth series, reconstructed from transaction flow.
 
-    We do not have a balance history: Plaid reports only the CURRENT balance,
-    and the accounts_snapshot table that would capture it daily is not yet being
-    populated. Rather than draw nothing — or worse, invent a shape — this
-    derives the series from data we actually hold:
+    We have no balance history: Plaid reports only a CURRENT balance, and the
+    accounts_snapshot table that would record it daily is not yet populated.
+    Rather than draw nothing — or invent a shape, which on a finance page is a
+    lie — this derives every point from transactions we actually hold:
 
-        net worth at end of month M = current net worth
-                                      − (net flow of every transaction after M)
+        net worth on day D = current net worth
+                             − (net flow of every transaction after D)
 
-    Every point is therefore computed from real transactions.
+    DAILY, and gap-filled. Aggregating by month gave four points, which draws a
+    diagonal rather than a trend. Days with no transactions still need a point,
+    because the sparkline spaces points evenly by index — omitting quiet days
+    would compress calm periods and stretch busy ones, distorting the time axis
+    into something that misrepresents when the change happened.
 
-    LIMITATION, stated plainly: this is exact for cash and credit accounts,
-    where balance moves only when a transaction occurs. It is approximate for
-    investments, whose balance also moves with the market — a 401k that gained
-    value without any transaction will appear flat. The series is a cash-flow
-    reconstruction, not a mark-to-market history, and the UI labels it as a
-    trend rather than a balance record.
+    LIMITATION, stated plainly: exact for cash and credit accounts, whose
+    balance moves only when a transaction occurs. Approximate for investments,
+    whose balance also moves with the market — a 401k that gained value without
+    a transaction appears flat. This is a cash-flow reconstruction, not a
+    mark-to-market history.
 
-    Transfers are excluded: moving money between your own accounts nets to zero
+    Transfers are excluded: money moved between your own accounts nets to zero
     and must not move the line.
     """
     rows = client.query(f"""
-        SELECT date_format(transaction_date, '%Y-%m') AS month,
-               sum(amount) AS net_flow
+        SELECT transaction_date AS day, sum(amount) AS net_flow
         FROM {database}.transactions
         WHERE status != 'REMOVED'
           AND transaction_type != 'TRANSFER'
-          AND transaction_date >= date_add('month', -{months}, DATE {sql_literal(today)})
-        GROUP BY date_format(transaction_date, '%Y-%m')
-        ORDER BY month
+          AND transaction_date >= date_add('day', -{days}, DATE {sql_literal(today)})
+        GROUP BY transaction_date
+        ORDER BY day
     """)
     if not rows:
         return []
 
-    # Walk backwards. Each point is the balance at the END of its month: the
-    # latest month is today's figure, and each earlier month is recovered by
-    # undoing the later month's flow.
-    #
-    # The label must be attached BEFORE subtracting, not after — subtracting
-    # month M's flow yields the end of month M-1, so labelling the result M
-    # shifts the whole series a month and duplicates the final point.
+    flow_by_day = {r["day"]: (r["net_flow"] or Decimal("0")) for r in rows}
+
+    from datetime import date as _date
+    from datetime import timedelta as _timedelta
+
+    end = _date.fromisoformat(today)
+    start = min(_date.fromisoformat(d) for d in flow_by_day)
+
+    # Walk backwards day by day. The balance is recorded BEFORE that day's flow
+    # is undone: subtracting day D's flow yields the close of D-1, so recording
+    # after would shift the whole series by one day.
     series: list[dict[str, str]] = []
     running = current_net_worth
-    for row in reversed(rows):
-        series.append({"date": row["month"], "value": str(running)})
-        running -= row["net_flow"] or Decimal("0")
+    cursor = end
+    while cursor >= start:
+        series.append({"date": cursor.isoformat(), "value": str(running)})
+        running -= flow_by_day.get(cursor.isoformat(), Decimal("0"))
+        cursor -= _timedelta(days=1)
 
     series.reverse()
     return series
