@@ -140,6 +140,66 @@ def list_transactions(
     return {"transactions": transactions, "transfer_groups": groups, "count": len(transactions)}
 
 
+def net_worth_series(
+    client: AthenaClient,
+    database: str,
+    *,
+    current_net_worth: Decimal,
+    today: str,
+    months: int = 12,
+) -> list[dict[str, str]]:
+    """Reconstruct net worth over time by walking transaction flow backwards.
+
+    We do not have a balance history: Plaid reports only the CURRENT balance,
+    and the accounts_snapshot table that would capture it daily is not yet being
+    populated. Rather than draw nothing — or worse, invent a shape — this
+    derives the series from data we actually hold:
+
+        net worth at end of month M = current net worth
+                                      − (net flow of every transaction after M)
+
+    Every point is therefore computed from real transactions.
+
+    LIMITATION, stated plainly: this is exact for cash and credit accounts,
+    where balance moves only when a transaction occurs. It is approximate for
+    investments, whose balance also moves with the market — a 401k that gained
+    value without any transaction will appear flat. The series is a cash-flow
+    reconstruction, not a mark-to-market history, and the UI labels it as a
+    trend rather than a balance record.
+
+    Transfers are excluded: moving money between your own accounts nets to zero
+    and must not move the line.
+    """
+    rows = client.query(f"""
+        SELECT date_format(transaction_date, '%Y-%m') AS month,
+               sum(amount) AS net_flow
+        FROM {database}.transactions
+        WHERE status != 'REMOVED'
+          AND transaction_type != 'TRANSFER'
+          AND transaction_date >= date_add('month', -{months}, DATE {sql_literal(today)})
+        GROUP BY date_format(transaction_date, '%Y-%m')
+        ORDER BY month
+    """)
+    if not rows:
+        return []
+
+    # Walk backwards. Each point is the balance at the END of its month: the
+    # latest month is today's figure, and each earlier month is recovered by
+    # undoing the later month's flow.
+    #
+    # The label must be attached BEFORE subtracting, not after — subtracting
+    # month M's flow yields the end of month M-1, so labelling the result M
+    # shifts the whole series a month and duplicates the final point.
+    series: list[dict[str, str]] = []
+    running = current_net_worth
+    for row in reversed(rows):
+        series.append({"date": row["month"], "value": str(running)})
+        running -= row["net_flow"] or Decimal("0")
+
+    series.reverse()
+    return series
+
+
 def dashboard(
     client: AthenaClient, database: str, *, month_start: str, today: str
 ) -> dict[str, Any]:

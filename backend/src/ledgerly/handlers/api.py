@@ -239,7 +239,12 @@ def dashboard_route(_event: dict[str, Any]) -> tuple[int, dict[str, Any]]:
         month_start=today.replace(day=1).isoformat(),
         today=today.isoformat(),
     )
+    from ledgerly.analytics.serving import net_worth_series
+
     body["net_worth"] = str(net_worth)
+    body["net_worth_series"] = net_worth_series(
+        _athena(), cfg.glue_database, current_net_worth=net_worth, today=today.isoformat()
+    )
     body["account_count"] = len(accounts)
     body["month"] = today.strftime("%B %Y")
     return 200, body

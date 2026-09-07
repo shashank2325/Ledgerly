@@ -57,27 +57,19 @@ export function Overview() {
     <>
       <PageHeader title="Overview" meta={d.month} />
 
-      {/* ── Net worth — the one number that matters most ──────────────────── */}
-      <section className="pb-8">
-        <div className="flex items-start justify-between gap-8">
-          <div>
-            <div className="t-label mb-2">Net worth</div>
-            <Money amount={d.net_worth} size="lg" exact={false} />
-            <div className="mt-1.5 flex items-baseline gap-2">
-              <span className="t-small text-ink-faint">
-                across {d.account_count} connected {d.account_count === 1 ? "account" : "accounts"}
-              </span>
-            </div>
-          </div>
-          {/* No trend line yet: net worth over time needs the daily balance
-              snapshot table, which is not being populated. Showing a fabricated
-              series would be worse than showing none (DESIGN.md §3.8). */}
-        </div>
-      </section>
-
       {/* ── This month: three figures on one line, outlined. ──────────────── */}
       <Section>
         <StatRow>
+          {/* Net worth sits with the others rather than above them: it is the
+              same kind of figure and separating it implied a hierarchy the
+              numbers do not have. It carries the trend because it is the only
+              one of the four with a meaningful history. */}
+          <Stat label="Net worth" trend={d.net_worth_series}>
+            <Money amount={d.net_worth} exact={false} size="lg" />
+            <div className="mt-1 t-small text-ink-faint">
+              {d.account_count} {d.account_count === 1 ? "account" : "accounts"}
+            </div>
+          </Stat>
           {[
             { label: "Income", amount: d.month_income, type: "INCOME" as const, to: "/app/ledger?type=INCOME" },
             { label: "Spending", amount: d.month_spending, type: undefined, to: "/app/ledger?type=EXPENSE" },

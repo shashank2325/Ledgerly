@@ -86,6 +86,9 @@ export interface TransactionsResponse {
 
 export interface DashboardResponse {
   net_worth: string;
+  /** Reconstructed from transaction flow, not a balance history — exact for
+   *  cash and credit, approximate for investments. See analytics/serving.py. */
+  net_worth_series: { date: string; value: string }[];
   account_count: number;
   month: string;
   month_income: string;
